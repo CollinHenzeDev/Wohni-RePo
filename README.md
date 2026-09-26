@@ -61,7 +61,9 @@ npm run typecheck
 - Von den übrigen Spielern (weder überkauft noch genau 21) verliert die **niedrigste Summe**
   ein Leben, bei Gleichstand alle mit dieser Summe.
 - Würden dadurch alle verbleibenden Spieler gleichzeitig ausscheiden, zählt die Runde nicht.
-- Wer 0 Leben hat, scheidet aus (wird ausgegraut). Wer als Letzter übrig bleibt, gewinnt.
+- Leben werden als bis zu 3 Herzen angezeigt. Das 4. (letzte) Leben zu verlieren zeigt sich nicht
+  durch ein weiteres Herz, sondern dadurch, dass der Spieler ausgegraut wird und ausscheidet.
+  Wer als Letzter übrig bleibt, gewinnt.
 - Jede Runde beginnt der nächste Spieler. Nur der **Gastgeber** (wer den Raum eröffnet hat)
   kann die nächste Runde starten.
 - *Offen:* Sonderregeln für den Schwimmer, und eine alternative Spielweise mit

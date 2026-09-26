@@ -1,63 +1,138 @@
 const PIPS = {
   1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
 };
+const ANIM_MS = 850;
+const MAX_HEARTS = 3;
 
-// Merkt sich, welche Würfe schon angezeigt wurden, damit nur neue animiert werden.
-const seen = new Set();
+// Modul-weiter Zustand für die Würfelbecher-Animation.
+const revealed = new Set(); // Würfe, deren Becher schon "geöffnet" wurde
+const pendingTimers = new Map(); // laufende Becher-Timer, damit nicht doppelt geplant wird
+const flipped = new Set(); // Würfe, deren Aufdeck-Animation schon einmal lief
+// Wessen Würfelbecher gerade im Aktionsbereich zu sehen ist. Bleibt auf dem Spieler stehen,
+// der zuletzt gewürfelt hat, bis dessen letzter Wurf fertig aufgedeckt ist – erst danach
+// springt die Anzeige zum nächsten Spieler weiter.
+let shownId = null;
 
 function die(h, value, { big = false, fresh = false } = {}) {
   return h("div", { class: `die${big ? " big" : ""}${fresh ? " new" : ""}`, "aria-label": String(value) },
     Array.from({ length: 9 }, (_, i) => h("span", { class: `pip${PIPS[value].includes(i) ? " on" : ""}` })));
 }
 
-export function renderDiceBlackjack({ room, me, send, h, isHost }) {
+function heartsRow(lives) {
+  const full = Math.min(lives, MAX_HEARTS);
+  return "❤️".repeat(full) + "🤍".repeat(MAX_HEARTS - full);
+}
+
+const throwKey = (roomCode, round, playerId, i) => `${roomCode}-${round}-${playerId}-${i}`;
+
+function lastThrowKey(roomCode, round, player) {
+  return player && player.rolls.length ? throwKey(roomCode, round, player.id, player.rolls.length - 1) : null;
+}
+
+/** Fertig gezeigt: entweder es gibt (noch) nichts zu würfeln, oder der letzte Wurf ist aufgedeckt. */
+function isDoneShowing(roomCode, round, player) {
+  const key = lastThrowKey(roomCode, round, player);
+  return key === null || revealed.has(key);
+}
+
+/** Deckt neue Würfe eines Spielers zeitverzögert auf (Würfelbecher schütteln, dann zeigen). */
+function scheduleReveals(roomCode, round, player, rerender) {
+  player.rolls.forEach((_, i) => {
+    const key = throwKey(roomCode, round, player.id, i);
+    if (revealed.has(key)) return;
+    if (i !== player.rolls.length - 1) {
+      revealed.add(key); // ältere Würfe beim Neuladen sofort zeigen, ohne Becher-Animation
+      return;
+    }
+    if (!pendingTimers.has(key)) {
+      pendingTimers.set(key, setTimeout(() => {
+        revealed.add(key);
+        pendingTimers.delete(key);
+        rerender();
+      }, ANIM_MS));
+    }
+  });
+}
+
+function diceRow(h, roomCode, round, player, maxRolls) {
+  const items = player.rolls.map((throwDice, i) => {
+    const key = throwKey(roomCode, round, player.id, i);
+    if (revealed.has(key)) {
+      const fresh = !flipped.has(key);
+      flipped.add(key);
+      return h("div", { class: "throw" }, throwDice.map((v) => die(h, v, { big: true, fresh })));
+    }
+    return h("div", { class: "cup shaking" }, h("div", { class: "cup-hand" }, "🖐️"), h("div", { class: "cup-body" }));
+  });
+  const lastKey = lastThrowKey(roomCode, round, player);
+  const isRolling = lastKey !== null && !revealed.has(lastKey);
+  if (!isRolling) {
+    for (let i = player.rolls.length; i < maxRolls; i++) items.push(h("div", { class: "die-slot-empty" }));
+  }
+  return { row: h("div", { class: "dice-row" }, items), isRolling };
+}
+
+function figurePosition(i, n) {
+  const angle = (-90 + (360 * i) / n) * (Math.PI / 180);
+  const x = 50 + 42 * Math.cos(angle);
+  const y = 50 + 38 * Math.sin(angle);
+  return `left:${x}%; top:${y}%`;
+}
+
+function figure(h, p, i, n, { me, isCurrent }) {
+  const el = h("div", { class: "figure" },
+    h("div", { class: "fig-lives" }, p.lives <= 0 ? "" : heartsRow(p.lives)),
+    h("div", { class: `figure-body${isCurrent ? " figure-current" : ""}` },
+      h("div", { class: "figure-head" }), h("div", { class: "figure-torso" })),
+    h("div", { class: `fig-name${p.lives <= 0 ? " figure-out" : ""}` }, p.name + (p.id === me ? " (du)" : "")),
+  );
+  el.setAttribute("style", figurePosition(i, n));
+  return el;
+}
+
+export function renderDiceBlackjack({ room, me, send, h, isHost, rerender }) {
   const s = room.game.view;
   const current = s.players[s.currentIndex];
-  const myTurn = s.phase === "turn" && current?.id === me;
+  const myPlayer = s.players.find((p) => p.id === me);
   const nameOf = (id) => s.players.find((p) => p.id === id)?.name ?? "?";
   const act = (action) => send({ t: "action", action });
 
-  const playerCard = (p) => {
-    const eliminated = p.lives <= 0;
-    const connected = room.members.find((m) => m.id === p.id)?.connected ?? true;
-    const totalClass = p.status === "busted" ? " bust" : p.total === s.target ? " hit21" : "";
-    return h("div", { class: `pl${p === current && s.phase === "turn" ? " current" : ""}${eliminated ? " out" : ""}` },
-      h("div", { class: "pl-head" },
-        h("div", {},
-          h("div", { class: "pl-name" }, p.name, p.id === me ? " (du)" : ""),
-          h("div", { class: "lives" }, eliminated ? "raus" : `${p.lives} Leben`, " ",
-            p.lives === 1 ? h("span", { class: "tag swim" }, "🏊 Schwimmer") : null,
-            p.status === "busted" ? h("span", { class: "tag bust" }, "überkauft") : null,
-            p.status === "stood" && !eliminated ? h("span", { class: "tag" }, "steht") : null,
-            eliminated ? h("span", { class: "tag out" }, "ausgeschieden") : null,
-            !connected ? h("span", { class: "tag out" }, "getrennt") : null),
-        ),
-        h("div", { class: `total${totalClass}` }, eliminated ? "" : String(p.total)),
-      ),
-      p.rolls.length
-        ? h("div", { class: "rolls" }, p.rolls.map((throwDice, i) => {
-            const key = `${s.round}:${p.id}:${i}`;
-            const fresh = !seen.has(key);
-            seen.add(key);
-            return h("div", { class: "throw" }, throwDice.map((v) => die(h, v, { fresh })));
-          }))
+  // Wer wird gerade im Aktionsbereich gezeigt? Erst weiterspringen, wenn der vorherige
+  // Würfelbecher fertig aufgedeckt ist.
+  let shownPlayer = s.players.find((p) => p.id === shownId);
+  if (s.phase === "turn") {
+    if (!shownPlayer) shownPlayer = current;
+    if (shownPlayer) scheduleReveals(room.code, s.round, shownPlayer, rerender);
+    if (shownPlayer !== current && isDoneShowing(room.code, s.round, shownPlayer)) {
+      shownPlayer = current;
+      if (shownPlayer) scheduleReveals(room.code, s.round, shownPlayer, rerender);
+    }
+    shownId = shownPlayer?.id ?? null;
+  }
+
+  const table = h("div", { class: "bj-table" },
+    h("div", { class: "bj-table-oval" }),
+    ...s.players.map((p, i) => figure(h, p, i, s.players.length, { me, isCurrent: p === current && s.phase === "turn" })),
+  );
+
+  let actionContent;
+  if (s.phase === "turn" && shownPlayer) {
+    const { row, isRolling } = diceRow(h, room.code, s.round, shownPlayer, s.maxRolls);
+    const myTurn = current?.id === me;
+    const canAct = myTurn && shownPlayer === current && !isRolling;
+    const rollsLeft = current ? s.maxRolls - current.rolls.length : 0;
+    actionContent = h("div", {},
+      h("p", { class: "turn-note" }, shownPlayer.id === me ? "Du bist am Zug" : `${shownPlayer.name} ist am Zug …`),
+      row,
+      canAct
+        ? h("div", { class: "stack" },
+            h("div", { class: "row" }, [1, 2, 3].slice(0, s.maxDice).map((n) =>
+              h("button", { disabled: rollsLeft <= 0, onclick: () => act({ type: "roll", dice: n }) }, `🎲 ${n}`))),
+            h("button", { class: "secondary", disabled: current.rolls.length === 0, onclick: () => act({ type: "stand" }) },
+              "Stehen bleiben"),
+          )
         : null,
     );
-  };
-
-  let controls;
-  if (s.phase === "turn") {
-    const rollsLeft = myTurn ? s.maxRolls - current.rolls.length : 0;
-    controls = myTurn
-      ? h("div", { class: "stack" },
-          h("div", { class: "muted", style: "text-align:center" },
-            `Deine Summe: ${current.total} – noch ${s.target - current.total} bis ${s.target} · ${rollsLeft} von ${s.maxRolls} Würfen übrig`),
-          h("div", { class: "row" }, [1, 2, 3].slice(0, s.maxDice).map((n) =>
-            h("button", { disabled: rollsLeft <= 0, onclick: () => act({ type: "roll", dice: n }) }, `🎲 ${n}`))),
-          h("button", { class: "secondary", disabled: current.rolls.length === 0, onclick: () => act({ type: "stand" }) },
-            "Stehen bleiben"),
-        )
-      : h("div", { class: "card banner" }, h("div", {}, `${current.name} ist am Zug …`));
   } else if (s.phase === "roundOver") {
     const r = s.lastResult;
     const line = (c) => {
@@ -65,7 +140,7 @@ export function renderDiceBlackjack({ room, me, send, h, isHost }) {
       const why = c.reason === "bust" ? "überkauft" : c.reason === "hit21" ? `genau ${s.target}` : "niedrigste Summe";
       return `${nameOf(c.playerId)} ${verb} (${why})`;
     };
-    controls = h("div", { class: "card banner stack" },
+    actionContent = h("div", { class: "banner stack" },
       r.voided
         ? h("div", { class: "big" }, "Alle Übrigen wären ausgeschieden – die Runde zählt nicht!")
         : r.changes.length
@@ -77,7 +152,7 @@ export function renderDiceBlackjack({ room, me, send, h, isHost }) {
         : h("p", { class: "muted" }, "Warte, bis der Gastgeber die nächste Runde startet …"),
     );
   } else {
-    controls = h("div", { class: "card banner stack" },
+    actionContent = h("div", { class: "banner stack" },
       h("div", { class: "big" }, `🏆 ${nameOf(s.winnerId)} gewinnt!`),
       isHost
         ? h("button", { onclick: () => send({ t: "lobby" }) }, "Zurück zur Lobby")
@@ -85,14 +160,24 @@ export function renderDiceBlackjack({ room, me, send, h, isHost }) {
     );
   }
 
-  return h("div", {},
-    h("div", { class: "muted", style: "margin-bottom:8px;display:flex;justify-content:space-between" },
-      h("span", {}, `Würfel-Blackjack · Runde ${s.round}`), h("span", {}, `Raum ${room.code}`)),
-    h("div", { class: "players" }, s.players.map(playerCard)),
-    h("div", { class: "controls" }, controls),
-    isHost && s.phase !== "gameOver"
-      ? h("button", { class: "danger", style: "margin-top:16px",
-          onclick: () => confirm("Spiel für alle abbrechen?") && send({ t: "lobby" }) }, "Spiel abbrechen")
-      : null,
+  const statRow = myPlayer && myPlayer.lives > 0
+    ? h("div", { class: "stat-row" },
+        h("div", { class: "stat-corner" },
+          h("div", { class: "big-num" }, `${myPlayer.total}/${s.target}`),
+          h("div", { class: "sub" }, `${Math.max(0, s.target - myPlayer.total)} Augen zur ${s.target}`),
+        ),
+      )
+    : null;
+
+  return h("div", { class: "bj" },
+    table,
+    h("div", { class: "bj-actions" },
+      statRow,
+      actionContent,
+      isHost && s.phase !== "gameOver"
+        ? h("button", { class: "danger", style: "margin-top:12px",
+            onclick: () => confirm("Spiel für alle abbrechen?") && send({ t: "lobby" }) }, "Spiel abbrechen")
+        : null,
+    ),
   );
 }

@@ -86,7 +86,7 @@ function render() {
   if (!room) return app.replaceChildren(homeView());
   if (!room.game) return app.replaceChildren(lobbyView());
   const renderer = gameRenderers[room.game.id];
-  app.replaceChildren(renderer({ room, me, send, h, isHost: room.hostId === me }));
+  app.replaceChildren(renderer({ room, me, send, h, isHost: room.hostId === me, rerender: render }));
 }
 
 function homeView() {
