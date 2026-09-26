@@ -18,21 +18,21 @@ export function renderDiceBlackjack({ room, me, send, h, isHost }) {
   const act = (action) => send({ t: "action", action });
 
   const playerCard = (p) => {
-    const hearts = "❤️".repeat(p.lives) + "🖤".repeat(Math.max(0, 4 - p.lives));
+    const eliminated = p.lives <= 0;
     const connected = room.members.find((m) => m.id === p.id)?.connected ?? true;
     const totalClass = p.status === "busted" ? " bust" : p.total === s.target ? " hit21" : "";
-    return h("div", { class: `pl${p === current && s.phase === "turn" ? " current" : ""}${p.status === "out" ? " out" : ""}` },
+    return h("div", { class: `pl${p === current && s.phase === "turn" ? " current" : ""}${eliminated ? " out" : ""}` },
       h("div", { class: "pl-head" },
         h("div", {},
           h("div", { class: "pl-name" }, p.name, p.id === me ? " (du)" : ""),
-          h("div", { class: "lives", title: `${p.lives} Leben` }, hearts, " ",
+          h("div", { class: "lives" }, eliminated ? "raus" : `${p.lives} Leben`, " ",
             p.lives === 1 ? h("span", { class: "tag swim" }, "🏊 Schwimmer") : null,
             p.status === "busted" ? h("span", { class: "tag bust" }, "überkauft") : null,
-            p.status === "stood" ? h("span", { class: "tag" }, "steht") : null,
-            p.status === "out" ? h("span", { class: "tag out" }, "raus") : null,
+            p.status === "stood" && !eliminated ? h("span", { class: "tag" }, "steht") : null,
+            eliminated ? h("span", { class: "tag out" }, "ausgeschieden") : null,
             !connected ? h("span", { class: "tag out" }, "getrennt") : null),
         ),
-        h("div", { class: `total${totalClass}` }, p.status === "out" ? "" : String(p.total)),
+        h("div", { class: `total${totalClass}` }, eliminated ? "" : String(p.total)),
       ),
       p.rolls.length
         ? h("div", { class: "rolls" }, p.rolls.map((throwDice, i) => {
@@ -47,24 +47,34 @@ export function renderDiceBlackjack({ room, me, send, h, isHost }) {
 
   let controls;
   if (s.phase === "turn") {
+    const rollsLeft = myTurn ? s.maxRolls - current.rolls.length : 0;
     controls = myTurn
       ? h("div", { class: "stack" },
           h("div", { class: "muted", style: "text-align:center" },
-            `Deine Summe: ${current.total} – noch ${s.target - current.total} bis ${s.target}`),
+            `Deine Summe: ${current.total} – noch ${s.target - current.total} bis ${s.target} · ${rollsLeft} von ${s.maxRolls} Würfen übrig`),
           h("div", { class: "row" }, [1, 2, 3].slice(0, s.maxDice).map((n) =>
-            h("button", { onclick: () => act({ type: "roll", dice: n }) }, `🎲 ${n}`))),
+            h("button", { disabled: rollsLeft <= 0, onclick: () => act({ type: "roll", dice: n }) }, `🎲 ${n}`))),
           h("button", { class: "secondary", disabled: current.rolls.length === 0, onclick: () => act({ type: "stand" }) },
             "Stehen bleiben"),
         )
       : h("div", { class: "card banner" }, h("div", {}, `${current.name} ist am Zug …`));
   } else if (s.phase === "roundOver") {
     const r = s.lastResult;
+    const line = (c) => {
+      const verb = c.delta > 0 ? `gewinnt ${c.delta} Leben` : `verliert ${-c.delta} Leben`;
+      const why = c.reason === "bust" ? "überkauft" : c.reason === "hit21" ? `genau ${s.target}` : "niedrigste Summe";
+      return `${nameOf(c.playerId)} ${verb} (${why})`;
+    };
     controls = h("div", { class: "card banner stack" },
-      h("div", { class: "big" }, r.voided
-        ? "Alle hätten verloren – die Runde zählt nicht!"
-        : `${r.loserIds.map(nameOf).join(", ")} ${r.loserIds.length > 1 ? "verlieren" : "verliert"} ein Leben`),
-      r.eliminatedIds.length ? h("div", {}, `${r.eliminatedIds.map(nameOf).join(", ")} ist raus!`) : null,
-      h("button", { onclick: () => act({ type: "nextRound" }) }, "Nächste Runde"),
+      r.voided
+        ? h("div", { class: "big" }, "Alle Übrigen wären ausgeschieden – die Runde zählt nicht!")
+        : r.changes.length
+          ? h("div", {}, r.changes.map((c) => h("div", {}, line(c))))
+          : h("div", { class: "muted" }, "Diesmal ändert sich nichts."),
+      r.eliminatedIds.length ? h("div", { class: "big" }, `${r.eliminatedIds.map(nameOf).join(", ")} ${r.eliminatedIds.length > 1 ? "scheiden" : "scheidet"} aus!`) : null,
+      isHost
+        ? h("button", { onclick: () => act({ type: "nextRound" }) }, "Nächste Runde")
+        : h("p", { class: "muted" }, "Warte, bis der Gastgeber die nächste Runde startet …"),
     );
   } else {
     controls = h("div", { class: "card banner stack" },

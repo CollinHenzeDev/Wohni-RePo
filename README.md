@@ -50,12 +50,19 @@ npm run typecheck
 ### Würfel-Blackjack
 
 - Jeder hat **4 Leben**. Wer nur noch 1 Leben hat, ist **Schwimmer** 🏊.
-- Pro Runde ist man reihum am Zug. Man wählt bei jedem Wurf **1, 2 oder 3 Würfel**,
-  die Augen werden addiert. Man muss mindestens einmal würfeln und kann dann jederzeit stehen bleiben.
-- Wer über **21** kommt, hat sich **überkauft**, und sein Zug ist sofort vorbei.
-- Am Rundenende verlieren **alle Überkauften** je ein Leben. Hat sich niemand überkauft,
-  verliert die **niedrigste Summe** (bei Gleichstand alle mit dieser Summe).
-- Würden alle verbleibenden Spieler gleichzeitig ausscheiden, zählt die Runde nicht.
-- Wer 0 Leben hat, ist raus. Wer als Letzter übrig bleibt, gewinnt.
-- Jede Runde beginnt der nächste Spieler.
-- *Offen:* Sonderregeln für den Schwimmer.
+- Pro Runde ist man reihum am Zug und hat **maximal 3 Würfelversuche**. Bei jedem Versuch
+  wählt man **1, 2 oder 3 Würfel**, die Augen werden addiert. Man muss mindestens einmal
+  würfeln und kann dann jederzeit stehen bleiben; nach dem 3. Versuch bleibt man automatisch stehen.
+- Wer über **21** kommt, hat sich **überkauft** und ist sofort mit dem Zug fertig:
+  - 22–23 Augen kosten **1 Leben**
+  - 24–26 Augen kosten **2 Leben**
+  - ab 27 Augen kosten **3 Leben**
+- Wer **genau 21** trifft, gewinnt **1 Leben** dazu (gedeckelt auf die 4 Start-Leben).
+- Von den übrigen Spielern (weder überkauft noch genau 21) verliert die **niedrigste Summe**
+  ein Leben, bei Gleichstand alle mit dieser Summe.
+- Würden dadurch alle verbleibenden Spieler gleichzeitig ausscheiden, zählt die Runde nicht.
+- Wer 0 Leben hat, scheidet aus (wird ausgegraut). Wer als Letzter übrig bleibt, gewinnt.
+- Jede Runde beginnt der nächste Spieler. Nur der **Gastgeber** (wer den Raum eröffnet hat)
+  kann die nächste Runde starten.
+- *Offen:* Sonderregeln für den Schwimmer, und eine alternative Spielweise mit
+  Rollenzuweisung ähnlich Werwolf.

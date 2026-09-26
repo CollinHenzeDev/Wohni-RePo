@@ -61,7 +61,7 @@ ul.plain li:last-child { border-bottom: 0; }
 .pl.out { opacity: .45; }
 .pl-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .pl-name { font-weight: 700; }
-.lives { letter-spacing: 2px; }
+.lives { color: var(--muted); font-size: .9rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .total { font-size: 1.6rem; font-weight: 800; min-width: 2.5ch; text-align: right; }
 .total.bust { color: var(--danger); text-decoration: line-through; }
 .total.hit21 { color: var(--accent); }

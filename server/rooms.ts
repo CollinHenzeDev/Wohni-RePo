@@ -90,7 +90,8 @@ export class Rooms {
 
   act(room: Room, memberId: string, action: unknown): Result<Room> {
     if (!room.game) return { ok: false, error: "Es läuft kein Spiel." };
-    const result = games[room.game.id].apply(room.game.state, memberId, action, this.rng);
+    const ctx = { isHost: room.hostId === memberId };
+    const result = games[room.game.id].apply(room.game.state, memberId, action, this.rng, ctx);
     if (!result.ok) return result;
     room.game.state = result.state;
     return { ok: true, value: room };

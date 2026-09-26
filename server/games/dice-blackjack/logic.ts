@@ -1,8 +1,10 @@
-import type { ActionResult, Game, PlayerInfo, Rng } from "../types.ts";
+import type { ActionContext, ActionResult, Game, PlayerInfo, Rng } from "../types.ts";
 
 export const TARGET = 21;
 export const START_LIVES = 4;
 export const MAX_DICE = 3;
+/** Maximal 3 Würfelversuche pro Zug, danach muss man stehen bleiben. */
+export const MAX_ROLLS = 3;
 
 export type PlayerStatus = "waiting" | "playing" | "stood" | "busted" | "out";
 
@@ -16,11 +18,18 @@ export interface Player {
   status: PlayerStatus;
 }
 
+/** Grund und Höhe einer Lebensänderung am Rundenende. */
+export interface RoundChange {
+  playerId: string;
+  delta: number;
+  reason: "bust" | "hit21" | "lowest";
+}
+
 export interface RoundResult {
   round: number;
-  loserIds: string[];
+  changes: RoundChange[];
   eliminatedIds: string[];
-  /** true, wenn alle verloren hätten und die Runde deshalb ohne Lebensverlust bleibt. */
+  /** true, wenn dabei alle Übrigen gleichzeitig ausgeschieden wären – die Runde zählt dann nicht. */
   voided: boolean;
 }
 
@@ -44,6 +53,13 @@ export type Action =
 export const isSwimmer = (p: Player) => p.lives === 1;
 
 const rollDie = (rng: Rng) => Math.floor(rng() * 6) + 1;
+
+/** Wie viele Leben ein Überkaufter verliert: 22–23 → 1, 24–26 → 2, ab 27 → 3. */
+function bustPenalty(total: number): number {
+  if (total >= 27) return 3;
+  if (total >= 24) return 2;
+  return 1;
+}
 
 function nextAliveIndex(players: Player[], from: number): number {
   for (let step = 1; step <= players.length; step++) {
@@ -92,13 +108,31 @@ export function setup(infos: PlayerInfo[], rng: Rng): State {
   return startRound(empty, starter);
 }
 
-/** Wer diese Runde ein Leben verliert: alle Überkauften, sonst die niedrigste Summe. */
-export function roundLosers(players: Player[]): string[] {
+/**
+ * Lebensänderungen am Rundenende:
+ * - Überkaufte verlieren je nach Höhe 1–3 Leben.
+ * - Wer genau 21 trifft, gewinnt 1 Leben.
+ * - Von den Übrigen (weder überkauft noch genau 21) verliert die niedrigste Summe 1 Leben,
+ *   bei Gleichstand alle mit dieser Summe.
+ */
+export function roundChanges(players: Player[]): RoundChange[] {
   const active = players.filter((p) => p.status === "stood" || p.status === "busted");
-  const busted = active.filter((p) => p.status === "busted");
-  if (busted.length > 0) return busted.map((p) => p.id);
-  const lowest = Math.min(...active.map((p) => p.total));
-  return active.filter((p) => p.total === lowest).map((p) => p.id);
+  const changes: RoundChange[] = [];
+
+  for (const p of active) {
+    if (p.status === "busted") changes.push({ playerId: p.id, delta: -bustPenalty(p.total), reason: "bust" });
+    else if (p.total === TARGET) changes.push({ playerId: p.id, delta: 1, reason: "hit21" });
+  }
+
+  const others = active.filter((p) => p.status === "stood" && p.total !== TARGET);
+  if (others.length > 0) {
+    const lowest = Math.min(...others.map((p) => p.total));
+    for (const p of others.filter((p) => p.total === lowest)) {
+      changes.push({ playerId: p.id, delta: -1, reason: "lowest" });
+    }
+  }
+
+  return changes;
 }
 
 function endTurn(state: State): State {
@@ -111,16 +145,18 @@ function endTurn(state: State): State {
 }
 
 function finishRound(state: State): State {
-  const loserIds = roundLosers(state.players);
+  const changes = roundChanges(state.players);
+  const byId = new Map(changes.map((c) => [c.playerId, c.delta]));
   const alive = state.players.filter((p) => p.lives > 0);
-  const wouldEliminate = alive.filter((p) => loserIds.includes(p.id) && p.lives === 1);
-  // Würden alle Übrigen gleichzeitig ausscheiden, zählt die Runde nicht.
-  const voided = wouldEliminate.length === alive.length;
+  // Würden dadurch alle Übrigen gleichzeitig ausscheiden, zählt die Runde nicht.
+  const voided = alive.every((p) => p.lives + (byId.get(p.id) ?? 0) <= 0);
 
-  const players = state.players.map((p) =>
-    !voided && loserIds.includes(p.id) ? { ...p, lives: p.lives - 1 } : p,
-  );
-  const eliminatedIds = voided ? [] : wouldEliminate.map((p) => p.id);
+  const players = state.players.map((p) => {
+    const delta = byId.get(p.id);
+    if (voided || delta === undefined) return p;
+    return { ...p, lives: Math.max(0, Math.min(START_LIVES, p.lives + delta)) };
+  });
+  const eliminatedIds = voided ? [] : alive.filter((p) => p.lives + (byId.get(p.id) ?? 0) <= 0).map((p) => p.id);
   const survivors = players.filter((p) => p.lives > 0);
   const winnerId = survivors.length === 1 ? survivors[0].id : null;
 
@@ -129,17 +165,24 @@ function finishRound(state: State): State {
     players,
     currentIndex: -1,
     phase: winnerId ? "gameOver" : "roundOver",
-    lastResult: { round: state.round, loserIds, eliminatedIds, voided },
+    lastResult: { round: state.round, changes, eliminatedIds, voided },
     winnerId,
   };
 }
 
-export function apply(state: State, playerId: string, action: Action, rng: Rng): ActionResult<State> {
+export function apply(
+  state: State,
+  playerId: string,
+  action: Action,
+  rng: Rng,
+  ctx: ActionContext,
+): ActionResult<State> {
   if (state.phase === "gameOver") return { ok: false, error: "Das Spiel ist vorbei." };
 
   if (action.type === "nextRound") {
     // Drücken mehrere gleichzeitig, startet nur der erste Klick die Runde.
     if (state.phase !== "roundOver") return { ok: true, state };
+    if (!ctx.isHost) return { ok: false, error: "Nur der Gastgeber kann die nächste Runde starten." };
     return { ok: true, state: startRound(state, nextAliveIndex(state.players, state.starterIndex)) };
   }
 
@@ -154,22 +197,28 @@ export function apply(state: State, playerId: string, action: Action, rng: Rng):
   }
 
   if (action.type === "roll") {
+    if (current.rolls.length >= MAX_ROLLS) {
+      return { ok: false, error: `Du hast schon ${MAX_ROLLS}-mal gewürfelt.` };
+    }
     const n = action.dice;
     if (!Number.isInteger(n) || n < 1 || n > MAX_DICE) {
       return { ok: false, error: `Wähle 1 bis ${MAX_DICE} Würfel.` };
     }
     const dice = Array.from({ length: n }, () => rollDie(rng));
+    const rolls = [...current.rolls, dice];
     const total = current.total + dice.reduce((a, b) => a + b, 0);
     const busted = total > TARGET;
+    // Nach dem letzten erlaubten Wurf bleibt man automatisch stehen.
+    const limitReached = !busted && rolls.length >= MAX_ROLLS;
     const updated: Player = {
       ...current,
       total,
-      rolls: [...current.rolls, dice],
-      status: busted ? "busted" : "playing",
+      rolls,
+      status: busted ? "busted" : limitReached ? "stood" : "playing",
     };
     const players = state.players.map((p) => (p.id === playerId ? updated : p));
     const next = { ...state, players };
-    return { ok: true, state: busted ? endTurn(next) : next };
+    return { ok: true, state: busted || limitReached ? endTurn(next) : next };
   }
 
   return { ok: false, error: "Unbekannte Aktion." };
@@ -182,5 +231,5 @@ export const diceBlackjack: Game<State, Action> = {
   maxPlayers: 10,
   setup,
   apply,
-  view: (state) => ({ ...state, target: TARGET, maxDice: MAX_DICE }),
+  view: (state) => ({ ...state, target: TARGET, maxDice: MAX_DICE, maxRolls: MAX_ROLLS }),
 };
