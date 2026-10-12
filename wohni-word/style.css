@@ -202,3 +202,36 @@ body.marks #doc p::after, body.marks #doc h1::after, body.marks #doc h2::after, 
   body.print-fixed #ftr { position: fixed; bottom: 0; left: 0; right: 0; }
   body.print-margin-hf #hdr, body.print-margin-hf #ftr { display: none !important; }
 }
+
+/* Spalten mit unterschiedlicher Breite (links/rechts schmal): linker Teil schwebt, rechter Teil beginnt nach dem Spaltenumbruch */
+#doc.cols-u { display: flow-root; }
+#doc.cols-u > *:not(.colbreak):not(.fobj) { float: left; clear: left; width: var(--c1w); box-sizing: border-box; }
+#doc.cols-u > .colbreak ~ *:not(.fobj) { float: none; clear: none; width: auto; margin-left: var(--c2x); }
+#doc .colbreak { display: block; height: 0; border-top: 1px dashed #4a7bd0; position: relative; user-select: none; break-after: column; margin: 0; }
+#doc .colbreak::after { content: "Spaltenumbruch"; position: absolute; left: 0; top: 2px; font: 10px "Segoe UI", sans-serif; color: #4a7bd0; white-space: nowrap; }
+#doc.cols-u .colbreak { float: none; clear: none; width: auto; height: 14px; border-top: 0; margin-left: var(--c2x); }
+#doc.cols-u .colbreak::after { top: 0; }
+
+/* Schwebende Objekte (Formen, Bilder hinter/vor dem Text) */
+#sheet { isolation: isolate; }
+#doc .fobj { position: absolute; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+#doc .fobj[data-wrap="behind"] { pointer-events: none; }
+#doc .fobj img { width: 100%; height: 100%; display: block; max-width: none; object-fit: fill; pointer-events: none; }
+#doc .fobj svg { display: block; }
+#fbox { position: absolute; border: 1.5px dashed var(--accent); z-index: 900; pointer-events: none; }
+#fbox[hidden] { display: none; }
+#fbox .fh { position: absolute; width: 11px; height: 11px; background: var(--accent); border: 2px solid #fff; border-radius: 3px; pointer-events: auto; }
+#fbox .nw { left: -7px; top: -7px; cursor: nwse-resize; } #fbox .ne { right: -7px; top: -7px; cursor: nesw-resize; }
+#fbox .sw { left: -7px; bottom: -7px; cursor: nesw-resize; } #fbox .se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+#fgrip { position: absolute; left: 50%; bottom: -26px; transform: translateX(-50%); font-style: normal; background: var(--accent); color: #fff; border-radius: 12px; padding: 1px 10px; cursor: move; pointer-events: auto; font-size: 13px; }
+#fbar { position: absolute; left: -2px; top: -38px; display: flex; gap: 2px; align-items: center; background: var(--chrome2); border: 1px solid var(--line); border-radius: 6px; padding: 3px; box-shadow: var(--shadow); pointer-events: auto; white-space: nowrap; }
+#fbar button { border: 0; background: transparent; border-radius: 4px; padding: 3px 6px; cursor: pointer; font-size: 11px; color: var(--text); }
+#fbar button:hover { background: var(--hover); } #fbar button.on { background: var(--active); } #fbar svg { width: 14px; height: 14px; vertical-align: middle; } #fbar .sep { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
+.tab.ctxf { display: none; color: #b0368c; }
+body.has-obj .tab.ctxf { display: block; }
+.lbl input[type=number] { height: 28px; border: 1px solid var(--line); border-radius: 4px; background: var(--chrome2); color: var(--text); padding: 0 4px; }
+@media print {
+  #fbox { display: none !important; }
+  #doc .fobj { left: var(--px) !important; top: var(--py) !important; }
+  #doc .colbreak { border: 0; } #doc .colbreak::after { display: none; }
+}

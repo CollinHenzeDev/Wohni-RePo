@@ -34,6 +34,7 @@
     <button class="tab" data-tab="review">Überprüfen</button>
     <button class="tab" data-tab="view">Ansicht</button>
     <button class="tab ctx" data-tab="table" id="tab-table">Tabelle</button>
+    <button class="tab ctxf" data-tab="format" id="tab-format">Objektformat</button>
   </nav>
 
   <!-- Menüband -->
@@ -193,6 +194,13 @@
       </div>
       <div class="group">
         <div class="row">
+          <button class="big" data-cmd="shapes" data-ic="shape"><span>Formen</span></button>
+          <button class="big" data-cmd="objList" data-ic="layers"><span>Objekte auswählen</span></button>
+        </div>
+        <div class="gname">Formen &amp; Objekte</div>
+      </div>
+      <div class="group">
+        <div class="row">
           <button class="big" data-cmd="link" data-ic="link"><span>Link</span></button>
           <button class="big" data-cmd="unlink" data-ic="unlink"><span>Link entfernen</span></button>
           <button class="big" data-cmd="toc" data-ic="toc"><span>Inhaltsverzeichnis</span></button>
@@ -236,13 +244,14 @@
             <select id="pageSize"><option>A4</option><option>A3</option><option>A5</option><option>Letter</option><option>Legal</option></select>
           </label>
           <label class="lbl">Spalten
-            <select id="columns"><option value="1">Eine</option><option value="2">Zwei</option><option value="3">Drei</option></select>
+            <select id="columns"><option value="1">Eine Spalte</option><option value="2">Zwei gleich breit</option><option value="3">Drei Spalten</option><option value="left">Zwei: links schmal</option><option value="right">Zwei: rechts schmal</option></select>
           </label>
         </div>
         <div class="gname">Seite einrichten</div>
       </div>
       <div class="group">
         <div class="row">
+          <button class="big" data-cmd="colBreak" data-ic="colbreak"><span>Spaltenumbruch</span></button>
           <button class="big" data-cmd="pageSetup" data-ic="gear"><span>Seite einrichten…</span></button>
         </div>
         <div class="gname">Erweitert</div>
@@ -333,6 +342,61 @@
         <div class="gname">Format</div>
       </div>
     </section>
+
+    <!-- OBJEKTFORMAT -->
+    <section class="panel" data-panel="format">
+      <div class="group">
+        <div class="row">
+          <label class="lbl">Textumbruch
+            <select id="fWrap"><option value="inline">In Zeile mit Text</option><option value="behind">Hinter dem Text</option><option value="front">Vor dem Text</option></select>
+          </label>
+          <button class="big" data-cmd="zFront" data-ic="tofront"><span>Nach vorne</span></button>
+          <button class="big" data-cmd="zBack" data-ic="toback"><span>Nach hinten</span></button>
+        </div>
+        <div class="gname">Anordnen</div>
+      </div>
+      <div class="group" id="shapeGroup">
+        <div class="row">
+          <span class="split"><button class="ib colorbtn" data-cmd="objFill" title="Füllfarbe"><span class="cl" id="objFillInd" style="background:#4472c4"></span><span class="gl" data-ic="bucket"></span></button><button class="ib arrow" data-pop="objFill">▾</button></span>
+          <span class="split"><button class="ib colorbtn" data-cmd="objLine" title="Linienfarbe"><span class="cl" id="objLineInd" style="background:#2f528f"></span><span class="gl" data-ic="marker"></span></button><button class="ib arrow" data-pop="objLine">▾</button></span>
+          <label class="lbl">Linie
+            <select id="fSw"><option value="0">keine</option><option value="1">1 px</option><option value="2">2 px</option><option value="3">3 px</option><option value="4">4 px</option><option value="6">6 px</option><option value="8">8 px</option></select>
+          </label>
+          <label class="lbl">Deckkraft
+            <select id="fOp"><option value="1">100 %</option><option value="0.8">80 %</option><option value="0.6">60 %</option><option value="0.4">40 %</option><option value="0.2">20 %</option></select>
+          </label>
+        </div>
+        <div class="gname">Form</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <label class="lbl">Von links (cm)<input type="number" id="fX" step="0.1" style="width:80px"></label>
+          <label class="lbl">Von oben (cm)<input type="number" id="fY" step="0.1" style="width:80px"></label>
+          <label class="lbl">Breite (cm)<input type="number" id="fW" step="0.1" min="0.2" style="width:80px"></label>
+          <label class="lbl">Höhe (cm)<input type="number" id="fH" step="0.1" min="0.1" style="width:80px"></label>
+        </div>
+        <div class="gname">Position &amp; Größe (ab Seitenrand)</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="ib" data-cmd="alL" title="Links an der Seite" data-ic="alignl"></button>
+          <button class="ib" data-cmd="alC" title="Horizontal zentrieren" data-ic="alignc"></button>
+          <button class="ib" data-cmd="alR" title="Rechts an der Seite" data-ic="alignr"></button>
+          <button class="ib" data-cmd="alT" title="Oben an der Seite">⤒</button>
+          <button class="ib" data-cmd="alM" title="Vertikal zentrieren">↕</button>
+          <button class="ib" data-cmd="alB" title="Unten an der Seite">⤓</button>
+          <button class="ib" data-cmd="alW" title="Ganze Seitenbreite" data-ic="fit"></button>
+        </div>
+        <div class="gname">An Seite ausrichten</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="objDup" data-ic="copy"><span>Duplizieren</span></button>
+          <button class="big" data-cmd="objDel" data-ic="trash"><span>Löschen</span></button>
+        </div>
+        <div class="gname">Objekt</div>
+      </div>
+    </section>
   </div>
 
   <!-- Lineal -->
@@ -362,12 +426,20 @@
           <div id="hdr" class="hf" contenteditable="true" spellcheck="true" data-label="Kopfzeile" hidden></div>
           <div id="doc" contenteditable="true" spellcheck="true" lang="de"></div>
           <div id="ftr" class="hf" contenteditable="true" spellcheck="true" data-label="Fußzeile" hidden></div>
+          <div id="fbox" hidden contenteditable="false">
+            <div id="fbar">
+              <button data-fo="behind">Hinter Text</button><button data-fo="front">Vor Text</button><button data-fo="inline">In Zeile</button><span class="sep"></span><button data-fo="del" data-ic="trash" title="Löschen"></button>
+            </div>
+            <i class="fh nw" data-h="nw"></i><i class="fh ne" data-h="ne"></i><i class="fh sw" data-h="sw"></i><i class="fh se" data-h="se"></i>
+            <i id="fgrip" title="Verschieben (ziehen)">✥</i>
+          </div>
           <div id="imgbox" hidden contenteditable="false">
             <div id="imgbar">
               <button data-img="25">25 %</button><button data-img="50">50 %</button><button data-img="75">75 %</button><button data-img="100">100 %</button>
               <span class="sep"></span>
               <button data-img="left" data-ic="alignl"></button><button data-img="center" data-ic="alignc"></button><button data-img="right" data-ic="alignr"></button>
               <span class="sep"></span>
+              <button data-img="behind" title="Hinter den Text legen">Hinter Text</button>
               <button data-img="alt" title="Alternativtext">Alt</button>
               <button data-img="del" data-ic="trash" title="Bild löschen"></button>
             </div>

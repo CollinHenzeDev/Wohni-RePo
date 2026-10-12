@@ -66,6 +66,11 @@
     pilcrow: '<path d="M14 4v16M10 4v16M14 4H9a4 4 0 000 8h1"/>',
     full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     grid: '<rect x="4" y="4" width="16" height="16"/><path d="M4 12h16M12 4v16"/>',
+    shape: '<rect x="3" y="11" width="10" height="9" rx="1"/><circle cx="15" cy="8" r="5"/>',
+    layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+    colbreak: '<rect x="3" y="4" width="7" height="16"/><rect x="14" y="4" width="7" height="16"/><path d="M12 4v16" stroke-dasharray="2 2"/>',
+    tofront: '<rect x="3" y="3" width="11" height="11" opacity=".4"/><rect x="10" y="10" width="11" height="11"/>',
+    toback: '<rect x="3" y="3" width="11" height="11"/><rect x="10" y="10" width="11" height="11" opacity=".4"/>',
     trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
   };
   const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -74,7 +79,7 @@
   /* ------------------------------------------------------------------ */
   /*  Zustand                                                            */
   /* ------------------------------------------------------------------ */
-  const defaultSettings = () => ({ w: 11906, h: 16838, top: 1417, right: 1417, bottom: 1417, left: 1417, cols: 1, defaultFont: 'Calibri', defaultSize: 11 });
+  const defaultSettings = () => ({ w: 11906, h: 16838, top: 1417, right: 1417, bottom: 1417, left: 1417, cols: 1, colMode: 'equal', defaultFont: 'Calibri', defaultSize: 11 });
   let settings = defaultSettings();
   const state = { name: 'Dokument1', handle: null, dirty: false, zoom: 100, loading: false };
 
@@ -183,7 +188,7 @@
     setHF(hdr, s.h); setHF(ftr, s.f);
     settings = JSON.parse(s.settings);
     applySettings(true);
-    lastRange = null; hideImgBox();
+    lastRange = null; hideImgBox(); hideF();
     setSel(s.sel);
     setDirty(true); updateUndoButtons(); schedState(); updateStatsSoon();
   }
@@ -286,9 +291,12 @@
       }
       if (keep) setSel(keep);
     }
-    if (doc.firstElementChild && doc.firstElementChild.tagName === 'TABLE') doc.insertBefore(Object.assign(document.createElement('p'), { innerHTML: '<br>' }), doc.firstChild);
+    const real = (el, dir) => { while (el && el.classList && el.classList.contains('fobj')) el = el[dir]; return el; };
+    const firstReal = real(doc.firstElementChild, 'nextElementSibling');
+    if (firstReal && firstReal.tagName === 'TABLE') doc.insertBefore(Object.assign(document.createElement('p'), { innerHTML: '<br>' }), firstReal);
     $$('table', doc).forEach((t) => {
-      if (t.parentNode === doc && (!t.nextElementSibling || t.nextElementSibling.tagName === 'TABLE')) t.after(Object.assign(document.createElement('p'), { innerHTML: '<br>' }));
+      const nx = real(t.nextElementSibling, 'nextElementSibling');
+      if (t.parentNode === doc && (!nx || nx.tagName === 'TABLE')) t.after(Object.assign(document.createElement('p'), { innerHTML: '<br>' }));
     });
     [hdr, ftr].forEach((h) => { if (!h.hidden && !h.firstChild) h.innerHTML = '<p><br></p>'; });
   }
@@ -503,12 +511,18 @@
     '#a61c00', '#cc0000', '#e69138', '#f1c232', '#6aa84f', '#45818e', '#3c78d8', '#3d85c6', '#674ea7', '#a64d79',
     '#5b0f00', '#660000', '#783f04', '#7f6000', '#274e13', '#0c343d', '#1c4587', '#073763', '#20124d', '#4c1130',
   ];
-  const colorState = { color: '#ff0000', hilite: '#ffff00', shade: '#d9e2f3', cellShade: '#fff2cc' };
+  const colorState = { color: '#ff0000', hilite: '#ffff00', shade: '#d9e2f3', cellShade: '#fff2cc', objFill: '#4472c4', objLine: '#2f528f' };
   const colorPick = document.createElement('input'); colorPick.type = 'color'; colorPick.style.cssText = 'position:fixed;left:-100px;top:0;opacity:0';
   document.body.appendChild(colorPick);
   function applyColor(kind, c) {
     if (c) colorState[kind] = c;
-    const ind = { color: '#colorInd', hilite: '#hiliteInd', shade: '#shadeInd', cellShade: '#cellShadeInd' }[kind];
+    const ind = { color: '#colorInd', hilite: '#hiliteInd', shade: '#shadeInd', cellShade: '#cellShadeInd', objFill: '#objFillInd', objLine: '#objLineInd' }[kind];
+    if (kind === 'objFill' || kind === 'objLine') {
+      if (!selF || selF.dataset.kind !== 'shape') { toast('Bitte zuerst eine Form auswählen.'); return; }
+      selF.dataset[kind === 'objFill' ? 'fill' : 'stroke'] = c || 'none';
+      if (kind === 'objLine' && c && !(+selF.dataset.sw)) { selF.dataset.sw = '2'; $('#fSw').value = '2'; }
+      renderShape(selF); pushHistory(); return;
+    }
     if (c && ind) $(ind).style.background = c;
     if (kind === 'color') exec('foreColor', c || '#000000');
     else if (kind === 'hilite') exec('hiliteColor', c || 'transparent');
@@ -521,7 +535,7 @@
   }
   function openPalette(kind, anchor) {
     const box = document.createElement('div');
-    const none = { color: 'Automatisch (Schwarz)', hilite: 'Keine Farbe', shade: 'Keine Farbe', cellShade: 'Keine Farbe' }[kind];
+    const none = { color: 'Automatisch (Schwarz)' }[kind] || 'Keine Farbe';
     box.innerHTML = `<button class="pbtn" data-c="">${none}</button><div class="plabel">Farben</div><div class="pal">${PALETTE.map((c) => `<button data-c="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div><button class="pbtn" data-more="1" style="margin-top:6px">Weitere Farben…</button>`;
     box.addEventListener('mousedown', (e) => e.preventDefault());
     box.addEventListener('click', (e) => {
@@ -575,13 +589,22 @@
     root.style.setProperty('--def-font', `"${s.defaultFont}"`);
     root.style.setProperty('--def-size', s.defaultSize + 'pt');
     sheet.style.padding = `${s.top / 15}px ${s.right / 15}px ${s.bottom / 15}px ${s.left / 15}px`;
-    doc.classList.toggle('cols', s.cols > 1);
-    doc.style.columnCount = s.cols > 1 ? s.cols : '';
+    const uneq = s.cols === 2 && s.colMode && s.colMode !== 'equal';
+    const gap = 708 / 15;
+    let c1 = 0;
+    if (uneq) {
+      const avail = (s.w - s.left - s.right) / 15 - gap;
+      c1 = s.colW ? s.colW[0] / 15 : avail * (s.colMode === 'left' ? 0.35 : 0.65);
+    }
+    doc.classList.toggle('cols-u', !!uneq);
+    doc.classList.toggle('cols', s.cols > 1 && !uneq);
+    doc.style.columnCount = s.cols > 1 && !uneq ? s.cols : '';
+    doc.style.setProperty('--c1w', c1 + 'px'); doc.style.setProperty('--c2x', (c1 + gap) + 'px');
     // Auswahlfelder synchronisieren
     const sizeName = (PAGE_NAMES.find(([, [w, h]]) => (Math.abs(w - s.w) < 30 && Math.abs(h - s.h) < 30) || (Math.abs(h - s.w) < 30 && Math.abs(w - s.h) < 30)) || [''])[0];
     if (sizeName) $('#pageSize').value = sizeName;
     $('#orientation').value = s.w > s.h ? 'landscape' : 'portrait';
-    $('#columns').value = String(Math.min(3, s.cols));
+    $('#columns').value = uneq ? s.colMode : String(Math.min(3, s.cols));
     const mp = `${s.top},${s.left}`;
     const sel = $('#marginPreset');
     sel.value = Array.from(sel.options).some((o) => o.value === mp) && s.top === s.bottom && s.left === s.right ? mp : 'custom';
@@ -650,14 +673,16 @@
         <label>Ausrichtung<select id="ps-or"><option value="portrait"${s.w <= s.h ? ' selected' : ''}>Hochformat</option><option value="landscape"${s.w > s.h ? ' selected' : ''}>Querformat</option></select></label></div>
         <div class="two"><label>Oben (cm)<input type="number" step="0.01" min="0" id="ps-t" value="${cm(s.top)}"></label><label>Unten (cm)<input type="number" step="0.01" min="0" id="ps-b" value="${cm(s.bottom)}"></label>
         <label>Links (cm)<input type="number" step="0.01" min="0" id="ps-l" value="${cm(s.left)}"></label><label>Rechts (cm)<input type="number" step="0.01" min="0" id="ps-r" value="${cm(s.right)}"></label></div>
-        <label>Spalten<select id="ps-c"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>`,
-      onOpen: (b) => { $('#ps-c', b).value = String(Math.min(3, s.cols)); },
+        <label>Spalten<select id="ps-c"><option value="1">1</option><option value="2">2 gleich breit</option><option value="3">3</option><option value="left">2: links schmal</option><option value="right">2: rechts schmal</option></select></label>`,
+      onOpen: (b) => { $('#ps-c', b).value = s.cols === 2 && s.colMode && s.colMode !== 'equal' ? s.colMode : String(Math.min(3, s.cols)); },
       buttons: [{ label: 'Abbrechen' }, {
         label: 'OK', primary: true, action: (b) => {
           const v = (id) => Math.max(0, Math.round(parseFloat($(id, b).value.replace(',', '.')) * 566.93) || 0);
           const [pw, phh] = DocxIO.PAGE_SIZES[$('#ps-size', b).value];
           const land = $('#ps-or', b).value === 'landscape';
-          Object.assign(settings, { w: land ? phh : pw, h: land ? pw : phh, top: v('#ps-t'), bottom: v('#ps-b'), left: v('#ps-l'), right: v('#ps-r'), cols: parseInt($('#ps-c', b).value, 10) });
+          Object.assign(settings, { w: land ? phh : pw, h: land ? pw : phh, top: v('#ps-t'), bottom: v('#ps-b'), left: v('#ps-l'), right: v('#ps-r') });
+          const cv = $('#ps-c', b).value;
+          if (cv === 'left' || cv === 'right') Object.assign(settings, { cols: 2, colMode: cv, colW: null }); else Object.assign(settings, { cols: parseInt(cv, 10), colMode: 'equal', colW: null });
           if (settings.left + settings.right > settings.w - 600 || settings.top + settings.bottom > settings.h - 600) { toast('Ränder zu groß.'); return false; }
           applySettings();
         },
@@ -858,7 +883,7 @@
 
   let selImg = null;
   const imgbox = $('#imgbox');
-  function hideImgBox() { if (selImg) { selImg.classList.remove('selimg'); if (!selImg.getAttribute('class')) selImg.removeAttribute('class'); } selImg = null; imgbox.hidden = true; }
+  function hideImgBox() { const had = !!selImg; if (selImg) { selImg.classList.remove('selimg'); if (!selImg.getAttribute('class')) selImg.removeAttribute('class'); } selImg = null; imgbox.hidden = true; if (had) refreshObjUi(); }
   function scaleOf() { return sheet.getBoundingClientRect().width / sheet.offsetWidth || 1; }
   function positionImgBox() {
     if (!selImg || !selImg.isConnected) { hideImgBox(); return; }
@@ -868,11 +893,15 @@
     imgbox.style.width = ir.width / sc + 4 + 'px'; imgbox.style.height = ir.height / sc + 4 + 'px';
   }
   function selectImg(img) {
+    if (selF) { selF = null; fbox.hidden = true; }
     if (selImg && selImg !== img) selImg.classList.remove('selimg');
-    selImg = img; img.classList.add('selimg'); positionImgBox();
+    selImg = img; img.classList.add('selimg'); positionImgBox(); refreshObjUi();
   }
   doc.addEventListener('click', (e) => {
-    if (e.target.tagName === 'IMG') selectImg(e.target); else hideImgBox();
+    const fo = e.target.closest && e.target.closest('.fobj');
+    if (fo) selectF(fo);
+    else if (e.target.tagName === 'IMG') selectImg(e.target);
+    else { hideImgBox(); hideF(); }
     const a = e.target.closest('a');
     if (a && (e.ctrlKey || e.metaKey)) {
       const h = a.getAttribute('href') || '';
@@ -911,11 +940,238 @@
     } else if (v === 'alt') {
       const a = prompt('Alternativtext für das Bild:', selImg.getAttribute('alt') || '');
       if (a !== null) selImg.setAttribute('alt', a);
+    } else if (v === 'behind') {
+      makeFloating(selImg, 'behind'); return;
     } else if (v === 'del') {
       const im = selImg; hideImgBox(); im.remove();
     }
     pushHistory(); positionImgBox();
   });
+
+  /* ------------------------------------------------------------------ */
+  /*  Schwebende Objekte: Formen und Bilder vor/hinter dem Text           */
+  /* ------------------------------------------------------------------ */
+  const fbox = $('#fbox');
+  let selF = null;
+  const SHAPES = [['rect', 'Rechteck'], ['roundrect', 'Abgerundetes Rechteck'], ['ellipse', 'Ellipse / Kreis'], ['triangle', 'Dreieck'], ['line', 'Linie']];
+  const sheetW = () => settings.w / 15;
+  function shapeSvg(el, forImage) {
+    const k = el.dataset.shape, fill = el.dataset.fill || 'none', stroke = el.dataset.stroke || 'none', sw = parseFloat(el.dataset.sw) || 0, op = el.dataset.op || '1';
+    const a = `fill="${fill}" fill-opacity="${op}" stroke="${sw ? stroke : 'none'}" stroke-opacity="${op}" stroke-width="${sw}" vector-effect="non-scaling-stroke"`;
+    let body;
+    if (k === 'ellipse') body = `<ellipse cx="50" cy="50" rx="50" ry="50" ${a}/>`;
+    else if (k === 'triangle') body = `<polygon points="50,0 100,100 0,100" ${a}/>`;
+    else if (k === 'line') body = `<line x1="0" y1="50" x2="100" y2="50" fill="none" stroke="${stroke}" stroke-opacity="${op}" stroke-width="${sw || 3}" vector-effect="non-scaling-stroke"/>`;
+    else body = `<rect x="0" y="0" width="100" height="100" ${k === 'roundrect' ? 'rx="10" ry="10"' : ''} ${a}/>`;
+    const dim = forImage ? `xmlns="http://www.w3.org/2000/svg" width="${forImage.w}" height="${forImage.h}"` : 'width="100%" height="100%"';
+    return `<svg ${dim} viewBox="0 0 100 100" preserveAspectRatio="none" style="overflow:visible;display:block">${body}</svg>`;
+  }
+  function renderShape(el) { if (el.dataset.kind === 'shape') el.innerHTML = shapeSvg(el); }
+  function applyWrap(el, mode) {
+    el.dataset.wrap = mode;
+    const z = parseInt(el.dataset.z, 10) || 0;
+    el.style.zIndex = String(mode === 'behind' ? -2000 + z : 10 + z);
+  }
+  const allF = () => $$('.fobj', doc);
+  const nextZ = () => allF().reduce((m, f) => Math.max(m, parseInt(f.dataset.z, 10) || 0), 0) + 1;
+  function setBox(el, x, y, w, h) {
+    el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.width = Math.round(w) + 'px'; el.style.height = Math.round(h) + 'px';
+  }
+  function newFobj(attrs, x, y, w, h, mode) {
+    const el = document.createElement('div');
+    el.className = 'fobj'; el.setAttribute('contenteditable', 'false');
+    Object.entries(attrs).forEach(([k, v]) => { el.dataset[k] = v; });
+    el.dataset.z = nextZ();
+    setBox(el, x, y, w, h); applyWrap(el, mode);
+    return el;
+  }
+  function caretPagePos() {
+    let y = settings.top / 15, x = settings.left / 15;
+    try {
+      const r = lastRange && lastEd === doc ? lastRange : null;
+      const rect = r && (r.getClientRects()[0] || elOf(r.startContainer).getBoundingClientRect());
+      if (rect) { y = (rect.top - sheet.getBoundingClientRect().top) / scaleOf(); }
+    } catch (e) { /* Standardposition */ }
+    return { x, y: Math.max(0, y) };
+  }
+  function insertShape(kind) {
+    const pos = caretPagePos();
+    const w = kind === 'line' ? 200 : 180, h = kind === 'line' ? 12 : (kind === 'ellipse' ? 180 : 110);
+    const el = newFobj({ kind: 'shape', shape: kind, fill: kind === 'line' ? 'none' : colorState.objFill, stroke: colorState.objLine, sw: kind === 'line' ? 3 : 2, op: 1 }, pos.x, pos.y, w, h, 'front');
+    doc.insertBefore(el, doc.firstChild);
+    renderShape(el);
+    pushHistory(); selectF(el);
+    toast('Form eingefügt. Im Reiter „Objektformat“ kannst du sie hinter den Text legen.', 5000);
+  }
+  function openShapes() {
+    const anchor = $('[data-cmd="shapes"]');
+    const box = document.createElement('div');
+    box.innerHTML = SHAPES.map(([k, n]) => `<button class="pbtn" data-shape="${k}">${n}</button>`).join('');
+    box.addEventListener('mousedown', (e) => e.preventDefault());
+    box.addEventListener('click', (e) => { const b = e.target.closest('[data-shape]'); if (b) { closePopup(); insertShape(b.dataset.shape); } });
+    showPopup(anchor, box);
+  }
+  function hideF() { if (selF) { selF = null; } fbox.hidden = true; refreshObjUi(); }
+  function positionF() {
+    if (!selF || !selF.isConnected) { hideF(); return; }
+    fbox.hidden = false;
+    fbox.style.left = selF.style.left; fbox.style.top = selF.style.top; fbox.style.width = selF.style.width; fbox.style.height = selF.style.height;
+    const wrap = selF.dataset.wrap;
+    $$('#fbar [data-fo]').forEach((b) => b.classList.toggle('on', b.dataset.fo === wrap));
+  }
+  function selectF(el) {
+    hideImgBox(); selF = el; positionF(); refreshObjUi();
+  }
+  const cm = (px) => (px / CM).toFixed(2);
+  function refreshObjUi() {
+    const obj = selF || selImg;
+    document.body.classList.toggle('has-obj', !!obj);
+    if (!obj) { if ($('#tab-format').classList.contains('active')) showTab('home'); return; }
+    $('#fWrap').value = selF ? selF.dataset.wrap : 'inline';
+    const isShape = selF && selF.dataset.kind === 'shape';
+    $$('#shapeGroup select, #shapeGroup button').forEach((b) => { b.disabled = !isShape; });
+    if (isShape) { $('#fSw').value = String(parseFloat(selF.dataset.sw) || 0); $('#fOp').value = selF.dataset.op || '1'; $('#objFillInd').style.background = selF.dataset.fill && selF.dataset.fill !== 'none' ? selF.dataset.fill : '#fff'; $('#objLineInd').style.background = selF.dataset.stroke || '#000'; }
+    ['fX', 'fY', 'fW', 'fH'].forEach((id) => { $('#' + id).disabled = !selF; });
+    if (selF) {
+      $('#fX').value = cm(parseFloat(selF.style.left)); $('#fY').value = cm(parseFloat(selF.style.top));
+      $('#fW').value = cm(parseFloat(selF.style.width)); $('#fH').value = cm(parseFloat(selF.style.height));
+    } else if (selImg) { $('#fW').value = cm(selImg.getBoundingClientRect().width / scaleOf()); $('#fH').value = cm(selImg.getBoundingClientRect().height / scaleOf()); }
+  }
+  function setWrap(mode) {
+    if (selF) {
+      if (mode === 'inline') { makeInline(selF); return; }
+      applyWrap(selF, mode); pushHistory(); positionF(); refreshObjUi();
+    } else if (selImg && mode !== 'inline') makeFloating(selImg, mode);
+  }
+  function makeFloating(img, mode) {
+    const ir = img.getBoundingClientRect(), sr = sheet.getBoundingClientRect(), sc = scaleOf();
+    const x = (ir.left - sr.left) / sc, y = (ir.top - sr.top) / sc, w = ir.width / sc, h = ir.height / sc;
+    const f = newFobj({ kind: 'img' }, x, y, w, h, mode);
+    const im = img.cloneNode(false);
+    im.removeAttribute('style'); im.removeAttribute('width'); im.removeAttribute('height'); im.removeAttribute('class');
+    f.appendChild(im);
+    const par = img.parentNode;
+    hideImgBox();
+    img.remove();
+    if (par && par !== doc && !par.textContent && !par.querySelector('img,br')) par.innerHTML = '<br>';
+    doc.insertBefore(f, doc.firstChild);
+    ensureStructure(); pushHistory(); selectF(f); updatePageCount();
+    if (mode === 'behind') toast('Bild liegt hinter dem Text. Auswählen: Alt+Klick auf das Bild oder Einfügen → Objekte auswählen.', 6000);
+  }
+  function makeInline(f) {
+    const im = f.querySelector('img');
+    if (!im) { toast('Formen können nur vor oder hinter dem Text stehen.'); return; }
+    const w = parseFloat(f.style.width);
+    const n = im.cloneNode(false);
+    n.style.width = Math.round(w) + 'px'; n.style.height = 'auto'; n.style.maxWidth = '100%';
+    // in den Absatz einfügen, der an der Position des Bildes liegt
+    const sr = sheet.getBoundingClientRect(), sc = scaleOf(), y = parseFloat(f.style.top);
+    let host = null;
+    for (const b of Array.from(doc.children)) { if (b.classList.contains('fobj') || b.classList.contains('colbreak') || b.classList.contains('pagebreak')) continue; if ((b.getBoundingClientRect().top - sr.top) / sc <= y + 1) host = b; else break; }
+    if (!host || !/^(P|H[1-6])$/.test(host.tagName)) host = Array.from(doc.children).find((b) => /^(P|H[1-6])$/.test(b.tagName));
+    if (!host) { host = document.createElement('p'); doc.appendChild(host); }
+    if (host.childNodes.length === 1 && host.firstChild.nodeName === 'BR') host.innerHTML = '';
+    host.insertBefore(n, host.firstChild);
+    f.remove(); hideF();
+    pushHistory(); updatePageCount(); selectImg(n);
+  }
+  function zOrder(dir) {
+    if (!selF) return;
+    const zs = allF().map((f) => parseInt(f.dataset.z, 10) || 0);
+    selF.dataset.z = dir > 0 ? Math.max(...zs) + 1 : Math.min(...zs) - 1;
+    applyWrap(selF, selF.dataset.wrap); pushHistory();
+  }
+  function objDelete() { if (selF) { const f = selF; hideF(); f.remove(); pushHistory(); } else if (selImg) { const im = selImg; hideImgBox(); im.remove(); pushHistory(); } }
+  function objDuplicate() {
+    if (!selF) return;
+    const c = selF.cloneNode(true); c.dataset.z = nextZ(); applyWrap(c, c.dataset.wrap);
+    c.style.left = parseFloat(c.style.left) + 16 + 'px'; c.style.top = parseFloat(c.style.top) + 16 + 'px';
+    doc.insertBefore(c, doc.firstChild); pushHistory(); selectF(c);
+  }
+  function alignObj(how) {
+    if (!selF) return;
+    const W = sheetW(), H = settings.h / 15, w = parseFloat(selF.style.width), h = parseFloat(selF.style.height);
+    let x = parseFloat(selF.style.left), y = parseFloat(selF.style.top);
+    if (how === 'l') x = 0; if (how === 'r') x = W - w; if (how === 'c') x = (W - w) / 2;
+    if (how === 't') y = 0; if (how === 'm') y = (H - h) / 2;
+    if (how === 'b') { const k = Math.floor(y / H); y = (k + 1) * H - h; }
+    if (how === 'w') { x = 0; selF.style.width = W + 'px'; }
+    selF.style.left = Math.round(x) + 'px'; selF.style.top = Math.round(y) + 'px';
+    pushHistory(); positionF(); refreshObjUi();
+  }
+  function objListDialog() {
+    const fs = allF();
+    const imgs = $$('img', doc).filter((i) => !i.closest('.fobj'));
+    if (!fs.length && !imgs.length) { toast('Es gibt noch keine Formen oder Bilder.'); return; }
+    const wrapName = { behind: 'hinter dem Text', front: 'vor dem Text' };
+    const box = document.createElement('div');
+    box.innerHTML = fs.map((f, i) => `<button class="pbtn" data-i="${i}">${f.dataset.kind === 'shape' ? (SHAPES.find((s) => s[0] === f.dataset.shape) || ['', 'Form'])[1] : 'Bild'} ${i + 1} (${wrapName[f.dataset.wrap]})</button>`).join('') +
+      imgs.map((im, i) => `<button class="pbtn" data-img="${i}">Bild in Zeile ${i + 1}</button>`).join('');
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.i != null) selectF(fs[+b.dataset.i]); else selectImg(imgs[+b.dataset.img]);
+      const t = selF || selImg; if (t) t.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (closeDialogFn) closeDialogFn();
+    });
+    dialog({ title: 'Objekte auswählen', body: box });
+  }
+  // Ziehen und Skalieren
+  function dragStart(e, kind, handle) {
+    if (!selF) return;
+    e.preventDefault(); e.stopPropagation();
+    const f = selF, sc = scaleOf(), sx = e.clientX, sy = e.clientY;
+    const x0 = parseFloat(f.style.left), y0 = parseFloat(f.style.top), w0 = parseFloat(f.style.width), h0 = parseFloat(f.style.height);
+    const keep = f.dataset.kind === 'img';
+    const target = e.currentTarget;
+    try { target.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
+    const move = (ev) => {
+      const dx = (ev.clientX - sx) / sc, dy = (ev.clientY - sy) / sc;
+      if (kind === 'move') { setBox(f, Math.max(-w0 + 20, Math.min(sheetW() - 20, x0 + dx)), Math.max(-h0 + 20, y0 + dy), w0, h0); }
+      else {
+        let x = x0, y = y0, w = w0, h = h0;
+        if (handle.includes('e')) w = w0 + dx; if (handle.includes('w')) { w = w0 - dx; x = x0 + dx; }
+        if (handle.includes('s')) h = h0 + dy; if (handle.includes('n')) { h = h0 - dy; y = y0 + dy; }
+        if (keep && w0 && h0) { const r = w0 / h0; if (Math.abs(w - w0) >= Math.abs(h - h0) * r) h = w / r; else w = h * r; if (handle.includes('w')) x = x0 + w0 - w; if (handle.includes('n')) y = y0 + h0 - h; }
+        if (w < 8) { w = 8; x = handle.includes('w') ? x0 + w0 - 8 : x0; } if (h < 4) { h = 4; y = handle.includes('n') ? y0 + h0 - 4 : y0; }
+        setBox(f, x, y, w, h);
+      }
+      positionF();
+    };
+    const up = () => { target.removeEventListener('pointermove', move); target.removeEventListener('pointerup', up); pushHistory(); refreshObjUi(); updatePageCount(); };
+    target.addEventListener('pointermove', move); target.addEventListener('pointerup', up);
+  }
+  $$('#fbox .fh').forEach((h) => h.addEventListener('pointerdown', (e) => dragStart(e, 'resize', h.dataset.h)));
+  $('#fgrip').addEventListener('pointerdown', (e) => dragStart(e, 'move'));
+  doc.addEventListener('pointerdown', (e) => {
+    const f = e.target.closest && e.target.closest('.fobj');
+    if (f && f.dataset.wrap !== 'behind') { selectF(f); dragStart(Object.assign(e, { currentTarget: f }), 'move'); }
+  });
+  $('#fbar').addEventListener('mousedown', (e) => e.preventDefault());
+  $('#fbar').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.fo === 'del') objDelete(); else setWrap(b.dataset.fo);
+  });
+  // Alt+Klick wählt auch Objekte, die hinter dem Text liegen
+  sheet.addEventListener('mousedown', (e) => {
+    if (!e.altKey) return;
+    const hits = allF().filter((f) => { const r = f.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
+    if (!hits.length) return;
+    hits.sort((a, b) => (+b.style.zIndex) - (+a.style.zIndex));
+    e.preventDefault(); e.stopPropagation(); selectF(hits[0]);
+  }, true);
+  $('#fWrap').addEventListener('change', (e) => setWrap(e.target.value));
+  $('#fSw').addEventListener('change', (e) => { if (selF) { selF.dataset.sw = e.target.value; renderShape(selF); pushHistory(); } });
+  $('#fOp').addEventListener('change', (e) => { if (selF) { selF.dataset.op = e.target.value; renderShape(selF); pushHistory(); } });
+  ['fX', 'fY', 'fW', 'fH'].forEach((id) => $('#' + id).addEventListener('change', (e) => {
+    if (!selF) return;
+    const v = parseFloat(e.target.value.replace(',', '.')); if (isNaN(v)) return;
+    const px = v * CM;
+    if (id === 'fX') selF.style.left = Math.round(px) + 'px';
+    if (id === 'fY') selF.style.top = Math.round(px) + 'px';
+    if (id === 'fW' && px >= 4) { const r = selF.dataset.kind === 'img' ? parseFloat(selF.style.height) / parseFloat(selF.style.width) : null; selF.style.width = Math.round(px) + 'px'; if (r) selF.style.height = Math.round(px * r) + 'px'; }
+    if (id === 'fH' && px >= 4) { const r = selF.dataset.kind === 'img' ? parseFloat(selF.style.width) / parseFloat(selF.style.height) : null; selF.style.height = Math.round(px) + 'px'; if (r) selF.style.width = Math.round(px * r) + 'px'; }
+    pushHistory(); positionF(); refreshObjUi();
+  }));
 
   /* ------------------------------------------------------------------ */
   /*  Einfügen: Link, Symbole, TOC, Kopf/Fuß                             */
@@ -1174,6 +1430,7 @@
       if (tag === 'OL' && keepAttrs.start) c.setAttribute('start', keepAttrs.start);
       if (tag === 'FONT') { if (keepAttrs.color) c.setAttribute('color', keepAttrs.color); if (keepAttrs.face) c.setAttribute('face', keepAttrs.face); }
       if (keepStructure && /^H[1-6]$/.test(tag) === false && keepAttrs.cls && /^(title|subtitle|quote)$/.test(keepAttrs.cls)) c.className = keepAttrs.cls;
+      if (keepStructure && keepAttrs.cls === 'colbreak') { c.className = 'colbreak'; c.setAttribute('contenteditable', 'false'); }
       if (keepStructure && keepAttrs.cls === 'pagebreak') { c.className = 'pagebreak'; c.setAttribute('contenteditable', 'false'); }
       if (keepStructure && keepAttrs.id && /^[\w-]+$/.test(keepAttrs.id)) c.id = keepAttrs.id;
       if (tag === 'TABLE' && keepStructure && keepAttrs.cls === 'noborder') c.className = 'noborder';
@@ -1226,7 +1483,7 @@
     settings = Object.assign(defaultSettings(), res.settings || {});
     state.name = name; state.handle = handle || null;
     $('#docname').value = name;
-    hideImgBox(); lastRange = null; lastEd = doc;
+    hideImgBox(); hideF(); lastRange = null; lastEd = doc;
     ensureStructure();
     applySettings(true);
     hist.stack = []; hist.idx = -1; hist.size = 0;
@@ -1293,8 +1550,28 @@
     hideImgBoxKeep();
     try {
       await new Promise((r) => requestAnimationFrame(r));
-      return await DocxIO.exportDocx(doc, { settings, headerEl: hdr.hidden ? null : hdr, footerEl: ftr.hidden ? null : ftr, title: state.name });
+      const floatPng = await shapePngs();
+      return await DocxIO.exportDocx(doc, { settings, headerEl: hdr.hidden ? null : hdr, footerEl: ftr.hidden ? null : ftr, title: state.name, floatPng });
     } finally { root.style.setProperty('--zoom', z / 100); }
+  }
+  // Formen werden für Word als Grafik (PNG) gespeichert
+  async function shapePngs() {
+    const map = new Map();
+    for (const f of allF()) {
+      if (f.dataset.kind !== 'shape') continue;
+      try {
+        const sc = 2, w = Math.max(2, Math.round(parseFloat(f.style.width) * sc)), h = Math.max(2, Math.round(parseFloat(f.style.height) * sc));
+        const img = new Image();
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(shapeSvg(f, { w, h }));
+        await img.decode();
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const b64 = c.toDataURL('image/png').split(',')[1], bin = atob(b64), bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        map.set(f, { mime: 'image/png', bytes });
+      } catch (e) { console.warn('Form konnte nicht in ein Bild umgewandelt werden', e); }
+    }
+    return map;
   }
   function hideImgBoxKeep() { /* Overlay liegt außerhalb des Dokuments und stört den Export nicht */ }
   function download(blob, name) {
@@ -1330,6 +1607,8 @@
   }
   function exportHtml() {
     const cl = doc.cloneNode(true);
+    cl.querySelectorAll('.fobj').forEach((f) => { const im = f.querySelector('img'); if (im) { im.style.maxWidth = '100%'; im.style.width = f.style.width; f.replaceWith(im); } else f.remove(); });
+    cl.querySelectorAll('.colbreak').forEach((p) => p.remove());
     cl.querySelectorAll('.pagebreak').forEach((p) => { p.removeAttribute('contenteditable'); p.removeAttribute('style'); p.setAttribute('style', 'page-break-after:always'); });
     const html = `<!doctype html><html lang="${doc.lang || 'de'}"><head><meta charset="utf-8"><title>${esc(state.name)}</title><style>body{max-width:${Math.round((settings.w - settings.left - settings.right) / 15)}px;margin:2em auto;font-family:"${settings.defaultFont}",Carlito,Arial,sans-serif;font-size:${settings.defaultSize}pt;line-height:1.08}p{margin:0 0 8pt}table{border-collapse:collapse}td,th{border:1px solid #000;padding:2px 5pt;vertical-align:top}table.noborder td,table.noborder th{border:0}img{max-width:100%}</style></head><body>${cl.innerHTML}</body></html>`;
     download(new Blob([html], { type: 'text/html;charset=utf-8' }), sanitizeName(state.name) + '.html');
@@ -1340,6 +1619,7 @@
 
   /* ---- Drucken ---- */
   function preparePrint() {
+    printObjects();
     const hasH = !hdr.hidden && hdr.textContent.trim(), hasF = !ftr.hidden && ftr.textContent.trim();
     document.body.classList.toggle('print-margin-hf', !!(hasH || hasF));
     const chrome = parseInt((navigator.userAgent.match(/Chrom(?:e|ium)\/(\d+)/) || [])[1], 10);
@@ -1365,7 +1645,14 @@
       ps.textContent = css ? `@page { ${css} }` : '';
     }
   }
-  function cleanupPrint() { document.body.classList.remove('print-margin-hf'); const ps = $('#printboxes'); if (ps) ps.textContent = ''; }
+  function printObjects() {
+    const H = settings.h / 15, mt = settings.top / 15, mb = settings.bottom / 15, ml = settings.left / 15, ch = H - mt - mb;
+    allF().forEach((f) => {
+      const x = parseFloat(f.style.left) || 0, y = parseFloat(f.style.top) || 0, k = y > 0 ? Math.floor(y / H) : 0;
+      f.style.setProperty('--px', (x - ml) + 'px'); f.style.setProperty('--py', (k * ch + (y - k * H - mt)) + 'px');
+    });
+  }
+  function cleanupPrint() { allF().forEach((f) => { f.style.removeProperty('--px'); f.style.removeProperty('--py'); }); document.body.classList.remove('print-margin-hf'); const ps = $('#printboxes'); if (ps) ps.textContent = ''; }
   window.addEventListener('beforeprint', preparePrint);
   window.addEventListener('afterprint', cleanupPrint);
 
@@ -1431,6 +1718,11 @@
     header: () => toggleHF(hdr, 'Kopfzeile'), footer: () => toggleHF(ftr, 'Fußzeile'), pageNumber: insertPageNumber,
     datetime: () => { restoreSel(); document.execCommand('insertText', false, new Date().toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' })); afterCmd(); },
     symbol: symbolDialog, pageSetup: pageSetupDialog,
+    colBreak: () => { restoreSel(); document.execCommand('insertHTML', false, '<div class="colbreak" contenteditable="false"></div>'); afterCmd(); updatePageCount(); },
+    shapes: (e) => openShapes(), objList: objListDialog,
+    objFill: () => applyColor('objFill', colorState.objFill), objLine: () => applyColor('objLine', colorState.objLine),
+    zFront: () => zOrder(1), zBack: () => zOrder(-1), objDup: objDuplicate, objDel: objDelete,
+    alL: () => alignObj('l'), alC: () => alignObj('c'), alR: () => alignObj('r'), alT: () => alignObj('t'), alM: () => alignObj('m'), alB: () => alignObj('b'), alW: () => alignObj('w'),
     spell: () => { const on = !doc.spellcheck; editors.forEach((e) => { e.spellcheck = on; }); $('#b-spell').classList.toggle('on', on); toast('Rechtschreibprüfung ' + (on ? 'eingeschaltet' : 'ausgeschaltet') + '.'); doc.blur(); doc.focus(); },
     zoomIn: () => setZoom(state.zoom + 10), zoomOut: () => setZoom(state.zoom - 10), zoom100: () => setZoom(100),
     zoomFit: () => setZoom((scrollEl.clientWidth - 40) / (settings.w / 15) * 100),
@@ -1492,7 +1784,23 @@
   };
   $('#pageSize').addEventListener('change', pageFromUi);
   $('#orientation').addEventListener('change', pageFromUi);
-  $('#columns').addEventListener('change', (e) => { settings.cols = +e.target.value; applySettings(); });
+  function setColumns(v) {
+    if (v === 'left' || v === 'right') { Object.assign(settings, { cols: 2, colMode: v, colW: null }); }
+    else { Object.assign(settings, { cols: +v, colMode: 'equal', colW: null }); }
+    applySettings();
+    if (v === 'left' || v === 'right') {
+      if (!doc.querySelector('.colbreak')) {
+        // Spaltenumbruch hinter den aktuellen Absatz setzen (Rest des Dokuments steht dann in der rechten Spalte)
+        restoreSel();
+        const blk = (currentBlock() && currentBlock().closest('#doc > *')) || doc.lastElementChild;
+        const mk = Object.assign(document.createElement('div'), { className: 'colbreak' }); mk.setAttribute('contenteditable', 'false');
+        if (blk && blk.parentNode === doc) blk.after(mk); else doc.appendChild(mk);
+        ensureStructure(); pushHistory(); updatePageCount();
+        toast('Spaltenumbruch eingefügt: Text davor steht in der ' + (v === 'left' ? 'schmalen linken' : 'breiten linken') + ' Spalte, Text danach rechts. Verschiebe ihn mit Ausschneiden/Einfügen oder setze ihn neu (Layout → Spaltenumbruch).', 8000);
+      }
+    }
+  }
+  $('#columns').addEventListener('change', (e) => setColumns(e.target.value));
   $('#lang').addEventListener('change', (e) => { editors.forEach((x) => { x.lang = e.target.value; }); $('#st-lang').textContent = e.target.selectedOptions[0].textContent; });
   $('#zoomRange').addEventListener('input', (e) => setZoom(+e.target.value));
   $('#docname').addEventListener('change', () => { state.name = sanitizeName($('#docname').value); $('#docname').value = state.name; setDirty(state.dirty); });
@@ -1573,7 +1881,7 @@
       else { document.execCommand('insertText', false, '\t'); afterCmd(); }
       return;
     }
-    if (e.key === 'Escape') { if (!popup.hidden) closePopup(); else if (selImg) hideImgBox(); return; }
+    if (e.key === 'Escape') { if (!popup.hidden) closePopup(); else if (selF) hideF(); else if (selImg) hideImgBox(); return; }
     if (!mod) return;
     const k = e.key.toLowerCase();
     const run = (fn) => { e.preventDefault(); fn(); };

@@ -20,11 +20,19 @@ In Firefox und Safari wird beim Speichern die .docx-Datei in den Download-Ordner
 | **Start** | Schriftart, Schriftgrad (frei wählbar), Fett / Kursiv / Unterstrichen / Durchgestrichen, Hoch- und Tiefgestellt, Schrift- und Hervorhebungsfarbe, Groß-/Kleinschreibung, Format übertragen, Formatierung löschen, Aufzählungen und Nummerierungen (Punkt, Kreis, Quadrat, 1. a. A. i. I.), Mehrfach-Verschachtelung, Einzüge, Ausrichtung (links, zentriert, rechts, Blocksatz), Zeilen- und Absatzabstand, Absatzschattierung, Formatvorlagen (Standard, Titel, Untertitel, Überschrift 1–3, Zitat), Suchen & Ersetzen, Formatierungszeichen |
 | **Einfügen** | Seitenumbruch, Tabellen, Bilder (Datei, Einfügen aus der Zwischenablage, Drag & Drop; Größe per Ziehen), Text aus Datei, Trennlinie, Links, Inhaltsverzeichnis, Kopf- und Fußzeile, Seitenzahl, Datum/Uhrzeit, Sonderzeichen |
 | **Tabelle** (erscheint in Tabellen) | Zeilen/Spalten einfügen und löschen, Zellen verbinden und teilen, Zellfarbe, Rahmenlinien, vertikale Ausrichtung |
-| **Layout** | Papierformat (A3, A4, A5, Letter, Legal), Hoch-/Querformat, Ränder, Spalten |
+| **Layout** | Papierformat (A3, A4, A5, Letter, Legal), Hoch-/Querformat, Ränder, Spalten (1, 2, 3 gleich breit sowie **zwei Spalten mit schmaler linker bzw. schmaler rechter Spalte**), Spaltenumbruch |
+| **Objektformat** (erscheint bei Auswahl) | Formen (Rechteck, abgerundetes Rechteck, Ellipse, Dreieck, Linie) und Bilder **in Zeile, hinter dem Text oder vor dem Text**; Füllung, Linie, Deckkraft, Position und Größe in cm, an der Seite ausrichten, nach vorne/hinten, duplizieren |
 | **Überprüfen** | Rechtschreibprüfung (Browser), Sprache, Wortzählung |
 | **Ansicht** | Zoom, Lineal, Formatierungszeichen, dunkles Design, Vollbild |
 
 Tastenkürzel (u. a. `Strg+S`, `Strg+O`, `Strg+F`, `Strg+H`, `Strg+K`, `Strg+Enter` für Seitenumbruch) stehen im Hilfe-Dialog (`?` oben rechts).
+
+## Lebenslauf: Spalten und Formen hinter dem Text
+
+* **Schmale Seitenspalte:** Layout → Spalten → „Zwei: links schmal“ (oder „rechts schmal“). Text *vor* dem Spaltenumbruch steht in der ersten Spalte, Text danach in der zweiten. Den Spaltenumbruch setzt du mit Layout → Spaltenumbruch.
+* **Farbige Fläche hinter dem Text:** Einfügen → Formen → Rechteck, dann im Reiter „Objektformat“ Textumbruch → „Hinter dem Text“, Farbe wählen und mit Position/Größe (cm) oder „An Seite ausrichten“ platzieren. Der Text darüber bleibt unverändert. Bilder lassen sich genauso hinter den Text legen.
+* Objekte hinter dem Text wählst du mit **Alt+Klick** oder über Einfügen → „Objekte auswählen“.
+* In Word erscheinen Formen als Grafik (nicht als bearbeitbare Form); Spalten und Spaltenumbruch bleiben echte Word-Spalten.
 
 ## Was beim .docx-Import/-Export erhalten bleibt
 

@@ -278,6 +278,33 @@
       `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
   }
 
+  function anchorRunXml(f, ctx) {
+    const img = f.querySelector('img');
+    let entry = null;
+    if (f.dataset.kind === 'shape') entry = ctx.floatPng && ctx.floatPng.get(f);
+    else if (img) entry = ctx.imageData.get(img) || dataUrlToBytes(img.getAttribute('src') || '');
+    if (!entry) return '';
+    const ext = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg', 'image/gif': 'gif', 'image/bmp': 'bmp' }[entry.mime];
+    if (!ext) return '';
+    ctx.imgCount++;
+    const name = `image${ctx.imgCount}.${ext}`;
+    ctx.zip.file('word/media/' + name, entry.bytes);
+    const rid = ctx.addRel('http://schemas.openxmlformats.org/officeDocument/2006/relationships/image', 'media/' + name);
+    const x = parseFloat(f.style.left) || 0, y = parseFloat(f.style.top) || 0;
+    const w = Math.max(1, parseFloat(f.style.width) || 10), h = Math.max(1, parseFloat(f.style.height) || 10);
+    const ph = ctx.pagePx || 1123;
+    const k = y > 0 ? Math.floor(y / ph) : 0, yIn = y - k * ph;
+    const cx = Math.round(w * 9525), cy = Math.round(h * 9525);
+    const behind = f.dataset.wrap === 'behind';
+    const id = ctx.docPrId++;
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${100000 + (parseInt(f.dataset.z, 10) || 0) + 2000}" behindDoc="${behind ? 1 : 0}" locked="0" layoutInCell="1" allowOverlap="1">` +
+      `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>${Math.round(x * 9525)}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>${Math.round(yIn * 9525)}</wp:posOffset></wp:positionV>` +
+      `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="${f.dataset.kind === 'shape' ? 'Form' : 'Bild'} ${id}"/><wp:cNvGraphicFramePr/>` +
+      `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}"/><pic:cNvPicPr/></pic:nvPicPr>` +
+      `<pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+      `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
+  }
+
   function inlineXml(nodes, props, ctx) {
     let out = '';
     nodes.forEach((n, idx) => {
@@ -331,6 +358,8 @@
     if (el) base = elemProps(el, {});
     if (el && el.tagName === 'PRE') base.font = 'Consolas';
     let runs = inlineXml(nodes, base, ctx);
+    if (el && ctx.hostMap && ctx.hostMap.has(el)) runs = ctx.hostMap.get(el).map((f) => anchorRunXml(f, ctx)).join('') + runs;
+    if (ctx.colBreak) { ctx.colBreak = false; runs = '<w:r><w:br w:type="column"/></w:r>' + runs; }
     if (el && el.id && /^[\w-]+$/.test(el.id)) {
       const bid = ctx.docPrId++;
       const name = 'bm_' + el.id.replace(/-/g, '_').slice(0, 36);
@@ -374,6 +403,11 @@
   function tableXml(table, ctx) {
     const rows = Array.from(table.rows);
     if (!rows.length) return '';
+    let pre = '';
+    if (ctx.colBreak) { ctx.colBreak = false; pre = '<w:p><w:r><w:br w:type="column"/></w:r></w:p>'; }
+    return pre + tableXml2(table, ctx, rows);
+  }
+  function tableXml2(table, ctx, rows) {
     const tr0 = table.getBoundingClientRect();
     const usable = ctx.contentWidthTwips;
     const cells = [];
@@ -478,6 +512,8 @@
       if (n.nodeType === 3) { pend.push(n); continue; }
       if (n.nodeType !== 1) continue;
       const t = n.tagName;
+      if (n.classList.contains('fobj')) continue; // schwebende Objekte werden an einem Absatz verankert
+      if (n.classList.contains('colbreak')) { flush(); ctx.colBreak = true; continue; }
       if (n.classList.contains('pagebreak')) { flush(); out += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'; continue; }
       if (t === 'UL' || t === 'OL') { flush(); out += listXml(n, ctx, 0, inh); continue; }
       if (t === 'TABLE') { flush(); out += tableXml(n, ctx); continue; }
@@ -496,6 +532,7 @@
       pend.push(n);
     }
     flush();
+    if (ctx.colBreak) { ctx.colBreak = false; out += '<w:p><w:r><w:br w:type="column"/></w:r></w:p>'; }
     return out;
   }
 
@@ -578,8 +615,29 @@
     if (opts.headerEl) for (const [k, v] of await prepareImages(opts.headerEl)) imageData.set(k, v);
     if (opts.footerEl) for (const [k, v] of await prepareImages(opts.footerEl)) imageData.set(k, v);
     const ctx = new ExportCtx(zip, { imageData, contentWidthTwips: s.w - s.left - s.right });
+    ctx.floatPng = opts.floatPng || new Map();
+    ctx.pagePx = s.h / 15;
+    // schwebende Objekte: am passenden Absatz verankern (der Absatz, der auf Höhe des Objekts beginnt)
+    const floaters = Array.from(bodyEl.querySelectorAll('.fobj'));
+    let extraAnchors = '';
+    if (floaters.length) {
+      ctx.hostMap = new Map();
+      const hosts = Array.from(bodyEl.children).filter((e) => /^(P|H[1-6])$/.test(e.tagName));
+      const base = (bodyEl.offsetParent || bodyEl).getBoundingClientRect().top;
+      floaters.sort((a, b) => (parseInt(a.dataset.z, 10) || 0) - (parseInt(b.dataset.z, 10) || 0));
+      for (const f of floaters) {
+        const y = parseFloat(f.style.top) || 0;
+        let host = null;
+        for (const h of hosts) { if (h.getBoundingClientRect().top - base <= y + 1) host = h; else break; }
+        host = host || hosts[0];
+        if (!host) { extraAnchors += anchorRunXml(f, ctx); continue; }
+        if (!ctx.hostMap.has(host)) ctx.hostMap.set(host, []);
+        ctx.hostMap.get(host).push(f);
+      }
+    }
 
-    const body = blocksXml(bodyEl, ctx, {}) || '<w:p/>';
+    let body = blocksXml(bodyEl, ctx, {}) || '<w:p/>';
+    if (extraAnchors) body = `<w:p>${extraAnchors}</w:p>` + body;
     const isEmpty = (el) => !el || (!el.textContent.trim() && !el.querySelector('img,.pagenum'));
     let hdrRel = '', ftrRel = '';
     const extraRels = [];
@@ -608,7 +666,7 @@
     const sect = `<w:sectPr>${hdrRel ? `<w:headerReference w:type="default" r:id="${hdrRel}"/>` : ''}${ftrRel ? `<w:footerReference w:type="default" r:id="${ftrRel}"/>` : ''}` +
       `<w:pgSz w:w="${s.w}" w:h="${s.h}"${landscape ? ' w:orient="landscape"' : ''}/>` +
       `<w:pgMar w:top="${s.top}" w:right="${s.right}" w:bottom="${s.bottom}" w:left="${s.left}" w:header="708" w:footer="708" w:gutter="0"/>` +
-      `<w:cols w:num="${s.cols || 1}" w:space="708"/></w:sectPr>`;
+      colsXml(s) + `</w:sectPr>`;
 
     zip.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NSDECL}><w:body>${body}${sect}</w:body></w:document>`);
     zip.file('word/styles.xml', stylesXml(s.defaultFont, s.defaultSize));
@@ -638,6 +696,16 @@
     return zip.generateAsync({ type: 'blob', mimeType: DOCX_MIME, compression: 'DEFLATE' });
   }
 
+  function colsXml(s) {
+    const n = s.cols || 1;
+    if (n === 2 && s.colMode && s.colMode !== 'equal') {
+      const avail = s.w - s.left - s.right - 708;
+      const w1 = s.colW ? s.colW[0] : Math.round(avail * (s.colMode === 'left' ? 0.35 : 0.65));
+      const w2 = s.colW ? s.colW[1] : avail - w1;
+      return `<w:cols w:num="2" w:space="708" w:equalWidth="0"><w:col w:w="${w1}" w:space="708"/><w:col w:w="${w2}"/></w:cols>`;
+    }
+    return `<w:cols w:num="${n}" w:space="708"/>`;
+  }
   const NSDECL = `xmlns:w="${W}" xmlns:r="${R}" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="${A}" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"`;
   function relsXml(rels) {
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
@@ -831,7 +899,8 @@
     };
     await loadImages(rels, baseDir);
 
-    const makeConverter = (relMap) => convertFactory({ rels: relMap, baseDir, styles, resolveStyle, defR, defP, defaults, themeFonts, numbering, images, defaultParaStyle });
+    const floaters = [];
+    const makeConverter = (relMap) => convertFactory({ floaters, rels: relMap, baseDir, styles, resolveStyle, defR, defP, defaults, themeFonts, numbering, images, defaultParaStyle });
 
     const body = kid(mainDoc.documentElement, 'body');
     const conv = makeConverter(rels);
@@ -850,7 +919,15 @@
       }
       const mar = kid(lastSect, 'pgMar');
       if (mar) for (const k of ['top', 'right', 'bottom', 'left']) { const v = num(wattr(mar, k)); if (v != null) settings[k] = Math.abs(v); }
-      const cols = kid(lastSect, 'cols'); if (cols) settings.cols = Math.min(4, num(wattr(cols, 'num')) || 1);
+      const cols = kid(lastSect, 'cols');
+      if (cols) {
+        settings.cols = Math.min(4, num(wattr(cols, 'num')) || 1);
+        const cw = kids(cols, 'col').map((c) => num(wattr(c, 'w')));
+        if (settings.cols === 2 && wattr(cols, 'equalWidth') === '0' && cw.length === 2 && cw[0] && cw[1]) {
+          const r = cw[0] / cw[1];
+          if (r < 0.85) { settings.colMode = 'left'; settings.colW = cw; } else if (r > 1.18) { settings.colMode = 'right'; settings.colW = cw; }
+        }
+      }
       for (const ref of kids(lastSect, 'headerReference').concat(kids(lastSect, 'footerReference'))) {
         if (wattr(ref, 'type') !== 'default') continue;
         const rid = ref.getAttributeNS(R, 'id');
@@ -870,6 +947,13 @@
     const blank = (h) => { const d = document.createElement('div'); d.innerHTML = h; return !d.textContent.trim() && !d.querySelector('img,.pagenum'); };
     if (blank(hdrHtml)) hdrHtml = '';
     if (blank(ftrHtml)) ftrHtml = '';
+    // verankerte Bilder als schwebende Objekte an den Anfang setzen (Seitenkoordinaten)
+    for (const f of floaters) {
+      if (f.dataset.relx === 'margin') f.style.left = parseFloat(f.style.left) + settings.left / 15 + 'px';
+      if (f.dataset.rely === 'margin') f.style.top = parseFloat(f.style.top) + settings.top / 15 + 'px';
+      f.removeAttribute('data-relx'); f.removeAttribute('data-rely');
+      container.insertBefore(f, container.firstChild);
+    }
     if (!container.firstChild) container.innerHTML = '<p><br></p>';
     return { html: container.innerHTML, header: hdrHtml, footer: ftrHtml, settings };
   }
@@ -964,6 +1048,7 @@
           case 'br': {
             const t = wattr(c, 'type');
             if (t === 'page') items.push({ type: 'pagebreak' });
+            else if (t === 'column') items.push({ type: 'colbreak' });
             else if (!hidden) items.push({ type: 'br' });
             break;
           }
@@ -998,7 +1083,20 @@
         let w = 0, h = 0;
         const ext2 = Array.from(el.getElementsByTagName('*')).find((e) => e.localName === 'extent');
         if (ext2) { w = Math.round(parseInt(ext2.getAttribute('cx'), 10) / 9525); h = Math.round(parseInt(ext2.getAttribute('cy'), 10) / 9525); }
-        items.push({ type: 'img', src, w, h, link: st.link });
+        const it = { type: 'img', src, w, h, link: st.link };
+        const anc = Array.from(el.getElementsByTagName('*')).find((e) => e.localName === 'anchor');
+        if (anc) {
+          const pos = (axis) => {
+            const p = Array.from(anc.children).find((e) => e.localName === 'position' + axis);
+            const off = p && Array.from(p.children).find((e) => e.localName === 'posOffset');
+            const rel = p && p.getAttribute('relativeFrom');
+            return off && (rel === 'page' || rel === 'margin') ? { v: Math.round(parseInt(off.textContent, 10) / 9525), rel } : null;
+          };
+          const px = pos('H'), py = pos('V');
+          const wrapNone = Array.from(anc.children).some((e) => e.localName === 'wrapNone');
+          if (px && py && wrapNone && w && h) it.float = { x: px.v, y: py.v, relX: px.rel, relY: py.rel, behind: anc.getAttribute('behindDoc') === '1' };
+        }
+        items.push(it);
       }
       for (const im of Array.from(el.getElementsByTagName('*')).filter((e) => e.localName === 'imagedata')) {
         const rid = im.getAttributeNS(R, 'id');
@@ -1044,7 +1142,16 @@
             node.querySelectorAll('span').forEach((s) => { s.style.color = ''; });
           }
         } else if (it.type === 'br') node = document.createElement('br');
-        else if (it.type === 'img') {
+        else if (it.type === 'img' && it.float) {
+          const f = document.createElement('div');
+          f.className = 'fobj'; f.setAttribute('contenteditable', 'false');
+          f.dataset.kind = 'img'; f.dataset.wrap = it.float.behind ? 'behind' : 'front'; f.dataset.z = String(env.floaters.length + 1);
+          f.dataset.relx = it.float.relX; f.dataset.rely = it.float.relY;
+          f.style.cssText = `left:${it.float.x}px;top:${it.float.y}px;width:${it.w}px;height:${it.h}px;z-index:${it.float.behind ? -2000 + env.floaters.length + 1 : 10 + env.floaters.length + 1}`;
+          const im = document.createElement('img'); im.src = it.src; f.appendChild(im);
+          env.floaters.push(f);
+          continue;
+        } else if (it.type === 'img') {
           const img = document.createElement('img');
           img.src = it.src;
           if (it.w) img.setAttribute('width', it.w);
@@ -1097,6 +1204,13 @@
       return d;
     }
 
+    function colBreakDiv() {
+      const d = document.createElement('div');
+      d.className = 'colbreak';
+      d.setAttribute('contenteditable', 'false');
+      return d;
+    }
+
     function listKind(numId, ilvl) {
       const n = numbering.nums[numId];
       if (!n) return { tag: 'ul', type: 'disc', start: 1 };
@@ -1128,11 +1242,11 @@
         if (direct.pageBreakBefore || (rs.p.pageBreakBefore && !direct.hasOwnProperty('pageBreakBefore'))) { closeLists(); out.appendChild(pageBreakDiv()); }
 
         // Absatz an Seitenumbrüchen aufteilen
-        const segments = [[]];
-        for (const it of items) { if (it.type === 'pagebreak') segments.push([]); else segments[segments.length - 1].push(it); }
+        const segments = [[]], brks = [null];
+        for (const it of items) { if (it.type === 'pagebreak' || it.type === 'colbreak') { segments.push([]); brks.push(it.type); } else segments[segments.length - 1].push(it); }
 
         segments.forEach((seg, si) => {
-          if (si > 0) { closeLists(); out.appendChild(pageBreakDiv()); }
+          if (si > 0) { closeLists(); out.appendChild(brks[si] === 'colbreak' ? colBreakDiv() : pageBreakDiv()); }
           const last = si === segments.length - 1;
           if (segments.length > 1 && seg.length === 0 && (last || si === 0)) return; // leerer Rest vor/nach einem Seitenumbruch
           if (num && si === 0) {
