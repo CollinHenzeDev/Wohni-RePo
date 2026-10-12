@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wohni Word</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%23185abd%27/%3E%3Ctext x=%2716%27 y=%2724%27 font-size=%2722%27 font-family=%27Arial%27 font-weight=%27bold%27 text-anchor=%27middle%27 fill=%27white%27%3EW%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Titelzeile -->
+  <header id="titlebar">
+    <div class="logo" aria-hidden="true">W</div>
+    <div class="quick">
+      <button class="qbtn" data-cmd="save" title="Speichern (Strg+S)" data-ic="save"></button>
+      <button class="qbtn" data-cmd="undo" title="Rückgängig (Strg+Z)" data-ic="undo"></button>
+      <button class="qbtn" data-cmd="redo" title="Wiederholen (Strg+Y)" data-ic="redo"></button>
+    </div>
+    <input id="docname" type="text" value="Dokument1" spellcheck="false" aria-label="Dokumentname">
+    <span id="savestate" class="muted"></span>
+    <span class="spacer"></span>
+    <button class="qbtn" data-cmd="toggleTheme" title="Helles/dunkles Design" data-ic="moon"></button>
+    <button class="qbtn" data-cmd="shortcuts" title="Tastenkürzel" data-ic="help"></button>
+  </header>
+
+  <!-- Reiter -->
+  <nav id="tabs" role="tablist">
+    <button class="tab file" data-tab="file">Datei</button>
+    <button class="tab active" data-tab="home">Start</button>
+    <button class="tab" data-tab="insert">Einfügen</button>
+    <button class="tab" data-tab="layout">Layout</button>
+    <button class="tab" data-tab="review">Überprüfen</button>
+    <button class="tab" data-tab="view">Ansicht</button>
+    <button class="tab ctx" data-tab="table" id="tab-table">Tabelle</button>
+  </nav>
+
+  <!-- Menüband -->
+  <div id="ribbon">
+
+    <!-- DATEI -->
+    <section class="panel" data-panel="file">
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="new" data-ic="new"><span>Neu</span></button>
+          <button class="big" data-cmd="open" data-ic="open"><span>Öffnen…</span></button>
+          <button class="big" data-cmd="save" data-ic="save"><span>Speichern</span></button>
+          <button class="big" data-cmd="saveAs" data-ic="saveas"><span>Speichern unter…</span></button>
+        </div>
+        <div class="gname">Datei (.docx öffnen &amp; speichern)</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="print" data-ic="print"><span>Drucken / PDF</span></button>
+          <button class="big" data-cmd="exportHtml" data-ic="code"><span>Als HTML</span></button>
+          <button class="big" data-cmd="exportTxt" data-ic="text"><span>Als Text</span></button>
+        </div>
+        <div class="gname">Exportieren</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="wordCount" data-ic="count"><span>Eigenschaften</span></button>
+          <button class="big" data-cmd="about" data-ic="help"><span>Info</span></button>
+        </div>
+        <div class="gname">Dokument</div>
+      </div>
+    </section>
+
+    <!-- START -->
+    <section class="panel active" data-panel="home">
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="paste" data-ic="paste"><span>Einfügen</span></button>
+          <div class="col">
+            <button class="sm" data-cmd="cut" data-ic="cut" title="Ausschneiden (Strg+X)"><span>Ausschneiden</span></button>
+            <button class="sm" data-cmd="copy" data-ic="copy" title="Kopieren (Strg+C)"><span>Kopieren</span></button>
+            <button class="sm" data-cmd="formatPainter" id="btn-painter" data-ic="brush" title="Format übertragen"><span>Format übertragen</span></button>
+          </div>
+        </div>
+        <div class="gname">Zwischenablage</div>
+      </div>
+
+      <div class="group">
+        <div class="row">
+          <select id="fontName" title="Schriftart" class="fontsel"></select>
+          <select id="fontSize" title="Schriftgrad" class="sizesel"></select>
+          <button class="ib" data-cmd="growFont" title="Schrift vergrößern (Strg+&gt;)">A<sup>▲</sup></button>
+          <button class="ib" data-cmd="shrinkFont" title="Schrift verkleinern (Strg+&lt;)">A<sup>▼</sup></button>
+          <select id="caseSel" title="Groß-/Kleinschreibung" class="casesel">
+            <option value="">Aa</option>
+            <option value="sentence">Satzanfang groß</option>
+            <option value="lower">kleinbuchstaben</option>
+            <option value="upper">GROSSBUCHSTABEN</option>
+            <option value="title">Jedes Wort Groß</option>
+            <option value="toggle">gROSS/kLEIN umkehren</option>
+          </select>
+          <button class="ib" data-cmd="clearFormat" data-ic="eraser" title="Formatierung löschen"></button>
+        </div>
+        <div class="row">
+          <button class="ib" data-cmd="bold" id="b-bold" title="Fett (Strg+B)"><b>F</b></button>
+          <button class="ib" data-cmd="italic" id="b-italic" title="Kursiv (Strg+I)"><i>K</i></button>
+          <button class="ib" data-cmd="underline" id="b-underline" title="Unterstrichen (Strg+U)"><u>U</u></button>
+          <button class="ib" data-cmd="strikeThrough" id="b-strikeThrough" title="Durchgestrichen"><s>abc</s></button>
+          <button class="ib" data-cmd="subscript" id="b-subscript" title="Tiefgestellt (Strg+=)">x<sub>2</sub></button>
+          <button class="ib" data-cmd="superscript" id="b-superscript" title="Hochgestellt (Strg+Umschalt+=)">x<sup>2</sup></button>
+          <span class="split">
+            <button class="ib colorbtn" data-cmd="hilite" title="Texthervorhebungsfarbe"><span class="cl" id="hiliteInd" style="background:#ffff00"></span><span class="gl" data-ic="marker"></span></button><button class="ib arrow" data-pop="hilite" title="Farbe wählen">▾</button>
+          </span>
+          <span class="split">
+            <button class="ib colorbtn" data-cmd="fontColor" title="Schriftfarbe"><span class="cl" id="colorInd" style="background:#ff0000"></span><span class="gl">A</span></button><button class="ib arrow" data-pop="color" title="Farbe wählen">▾</button>
+          </span>
+        </div>
+        <div class="gname">Schriftart</div>
+      </div>
+
+      <div class="group">
+        <div class="row">
+          <button class="ib" data-cmd="ul" id="b-ul" data-ic="ul" title="Aufzählungszeichen"></button>
+          <button class="ib" data-cmd="ol" id="b-ol" data-ic="ol" title="Nummerierung"></button>
+          <select id="listType" title="Listenformat" class="casesel">
+            <option value="">Liste…</option>
+            <option value="disc">● Punkt</option><option value="circle">○ Kreis</option><option value="square">■ Quadrat</option>
+            <option value="decimal">1. 2. 3.</option><option value="lower-alpha">a. b. c.</option><option value="upper-alpha">A. B. C.</option>
+            <option value="lower-roman">i. ii. iii.</option><option value="upper-roman">I. II. III.</option>
+          </select>
+          <button class="ib" data-cmd="outdent" data-ic="outdent" title="Einzug verkleinern"></button>
+          <button class="ib" data-cmd="indent" data-ic="indent" title="Einzug vergrößern"></button>
+          <button class="ib" data-cmd="marks" id="b-marks" title="Formatierungszeichen anzeigen (Strg+Umschalt+8)">¶</button>
+        </div>
+        <div class="row">
+          <button class="ib" data-cmd="justifyLeft" id="b-justifyLeft" data-ic="alignl" title="Linksbündig (Strg+L)"></button>
+          <button class="ib" data-cmd="justifyCenter" id="b-justifyCenter" data-ic="alignc" title="Zentriert (Strg+E)"></button>
+          <button class="ib" data-cmd="justifyRight" id="b-justifyRight" data-ic="alignr" title="Rechtsbündig (Strg+R)"></button>
+          <button class="ib" data-cmd="justifyFull" id="b-justifyFull" data-ic="alignj" title="Blocksatz (Strg+J)"></button>
+          <select id="lineSpacing" title="Zeilenabstand" class="casesel">
+            <option value="">↕ Zeilen</option>
+            <option value="1">1,0</option><option value="1.08">1,08</option><option value="1.15">1,15</option>
+            <option value="1.5">1,5</option><option value="2">2,0</option><option value="2.5">2,5</option><option value="3">3,0</option>
+          </select>
+          <select id="paraSpacing" title="Abstand nach Absatz" class="casesel">
+            <option value="">↧ Abstand</option>
+            <option value="0">Danach: 0 pt</option><option value="6">Danach: 6 pt</option><option value="8">Danach: 8 pt</option>
+            <option value="12">Danach: 12 pt</option><option value="18">Danach: 18 pt</option>
+            <option value="b0">Davor: 0 pt</option><option value="b6">Davor: 6 pt</option><option value="b12">Davor: 12 pt</option><option value="b18">Davor: 18 pt</option>
+          </select>
+          <span class="split">
+            <button class="ib colorbtn" data-cmd="shade" title="Absatzschattierung"><span class="cl" id="shadeInd" style="background:#d9e2f3"></span><span class="gl" data-ic="bucket"></span></button><button class="ib arrow" data-pop="shade" title="Farbe wählen">▾</button>
+          </span>
+        </div>
+        <div class="gname">Absatz</div>
+      </div>
+
+      <div class="group">
+        <div class="gallery" id="styleGallery">
+          <button data-style="normal"><span class="pv" style="font-size:12px">AaBbCc</span>Standard</button>
+          <button data-style="title"><span class="pv" style="font-size:17px;font-family:'Calibri Light',Carlito,sans-serif">AaBb</span>Titel</button>
+          <button data-style="subtitle"><span class="pv" style="font-size:12px;color:#5a5a5a;letter-spacing:.5px">AaBbCc</span>Untertitel</button>
+          <button data-style="h1"><span class="pv" style="font-size:16px;color:#2f5496;font-family:'Calibri Light',Carlito,sans-serif">AaBbCc</span>Überschrift 1</button>
+          <button data-style="h2"><span class="pv" style="font-size:14px;color:#2f5496;font-family:'Calibri Light',Carlito,sans-serif">AaBbCc</span>Überschrift 2</button>
+          <button data-style="h3"><span class="pv" style="font-size:13px;color:#1f3763;font-family:'Calibri Light',Carlito,sans-serif">AaBbCc</span>Überschrift 3</button>
+          <button data-style="quote"><span class="pv" style="font-size:12px;font-style:italic;color:#404040">AaBbCc</span>Zitat</button>
+        </div>
+        <div class="gname">Formatvorlagen</div>
+      </div>
+
+      <div class="group">
+        <div class="col">
+          <button class="sm" data-cmd="find" data-ic="search"><span>Suchen</span></button>
+          <button class="sm" data-cmd="replace" data-ic="replace"><span>Ersetzen</span></button>
+          <button class="sm" data-cmd="selectAll" data-ic="select"><span>Alles markieren</span></button>
+        </div>
+        <div class="gname">Bearbeiten</div>
+      </div>
+    </section>
+
+    <!-- EINFÜGEN -->
+    <section class="panel" data-panel="insert">
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="pageBreak" data-ic="pagebreak"><span>Seitenumbruch</span></button>
+          <button class="big" data-cmd="table" data-ic="table"><span>Tabelle</span></button>
+        </div>
+        <div class="gname">Seiten &amp; Tabellen</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="image" data-ic="image"><span>Bild</span></button>
+          <button class="big" data-cmd="fileInsert" data-ic="open"><span>Text aus Datei</span></button>
+          <button class="big" data-cmd="hr" data-ic="hr"><span>Linie</span></button>
+        </div>
+        <div class="gname">Illustrationen</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="link" data-ic="link"><span>Link</span></button>
+          <button class="big" data-cmd="unlink" data-ic="unlink"><span>Link entfernen</span></button>
+          <button class="big" data-cmd="toc" data-ic="toc"><span>Inhaltsverzeichnis</span></button>
+        </div>
+        <div class="gname">Verknüpfungen</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="header" data-ic="header"><span>Kopfzeile</span></button>
+          <button class="big" data-cmd="footer" data-ic="footer"><span>Fußzeile</span></button>
+          <button class="big" data-cmd="pageNumber" data-ic="hash"><span>Seitenzahl</span></button>
+        </div>
+        <div class="gname">Kopf- &amp; Fußzeile</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="datetime" data-ic="clock"><span>Datum / Uhrzeit</span></button>
+          <button class="big" data-cmd="symbol" data-ic="omega"><span>Symbol</span></button>
+        </div>
+        <div class="gname">Text &amp; Symbole</div>
+      </div>
+    </section>
+
+    <!-- LAYOUT -->
+    <section class="panel" data-panel="layout">
+      <div class="group">
+        <div class="row">
+          <label class="lbl">Ränder
+            <select id="marginPreset">
+              <option value="1417,1417">Normal (2,5 cm)</option>
+              <option value="720,720">Schmal (1,27 cm)</option>
+              <option value="1440,1080">Mäßig (2,54 / 1,91 cm)</option>
+              <option value="1440,2880">Breit (2,54 / 5,08 cm)</option>
+              <option value="custom">Benutzerdefiniert…</option>
+            </select>
+          </label>
+          <label class="lbl">Ausrichtung
+            <select id="orientation"><option value="portrait">Hochformat</option><option value="landscape">Querformat</option></select>
+          </label>
+          <label class="lbl">Größe
+            <select id="pageSize"><option>A4</option><option>A3</option><option>A5</option><option>Letter</option><option>Legal</option></select>
+          </label>
+          <label class="lbl">Spalten
+            <select id="columns"><option value="1">Eine</option><option value="2">Zwei</option><option value="3">Drei</option></select>
+          </label>
+        </div>
+        <div class="gname">Seite einrichten</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="pageSetup" data-ic="gear"><span>Seite einrichten…</span></button>
+        </div>
+        <div class="gname">Erweitert</div>
+      </div>
+    </section>
+
+    <!-- ÜBERPRÜFEN -->
+    <section class="panel" data-panel="review">
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="spell" id="b-spell" data-ic="spell"><span>Rechtschreibung</span></button>
+          <button class="big" data-cmd="wordCount" data-ic="count"><span>Wörter zählen</span></button>
+        </div>
+        <div class="gname">Dokumentprüfung</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <label class="lbl">Sprache
+            <select id="lang"><option value="de">Deutsch</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="it">Italiano</option><option value="nl">Nederlands</option><option value="pl">Polski</option><option value="tr">Türkçe</option></select>
+          </label>
+        </div>
+        <div class="gname">Sprache</div>
+      </div>
+    </section>
+
+    <!-- ANSICHT -->
+    <section class="panel" data-panel="view">
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="zoomOut" data-ic="zoomout"><span>Verkleinern</span></button>
+          <button class="big" data-cmd="zoom100" data-ic="zoom"><span>100 %</span></button>
+          <button class="big" data-cmd="zoomIn" data-ic="zoomin"><span>Vergrößern</span></button>
+          <button class="big" data-cmd="zoomFit" data-ic="fit"><span>Seitenbreite</span></button>
+        </div>
+        <div class="gname">Zoom</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-cmd="ruler" id="b-ruler" data-ic="ruler"><span>Lineal</span></button>
+          <button class="big" data-cmd="marks" data-ic="pilcrow"><span>Formatierungszeichen</span></button>
+          <button class="big" data-cmd="toggleTheme" data-ic="moon"><span>Dunkles Design</span></button>
+          <button class="big" data-cmd="fullscreen" data-ic="full"><span>Vollbild</span></button>
+        </div>
+        <div class="gname">Anzeigen</div>
+      </div>
+    </section>
+
+    <!-- TABELLE -->
+    <section class="panel" data-panel="table">
+      <div class="group">
+        <div class="col">
+          <button class="sm" data-cmd="rowAbove"><span>↑ Zeile oberhalb einfügen</span></button>
+          <button class="sm" data-cmd="rowBelow"><span>↓ Zeile unterhalb einfügen</span></button>
+        </div>
+        <div class="col">
+          <button class="sm" data-cmd="colLeft"><span>← Spalte links einfügen</span></button>
+          <button class="sm" data-cmd="colRight"><span>→ Spalte rechts einfügen</span></button>
+        </div>
+        <div class="gname">Einfügen</div>
+      </div>
+      <div class="group">
+        <div class="col">
+          <button class="sm" data-cmd="delRow"><span>Zeile löschen</span></button>
+          <button class="sm" data-cmd="delCol"><span>Spalte löschen</span></button>
+          <button class="sm" data-cmd="delTable"><span>Tabelle löschen</span></button>
+        </div>
+        <div class="gname">Löschen</div>
+      </div>
+      <div class="group">
+        <div class="col">
+          <button class="sm" data-cmd="mergeRight"><span>Nach rechts verbinden</span></button>
+          <button class="sm" data-cmd="mergeDown"><span>Nach unten verbinden</span></button>
+          <button class="sm" data-cmd="splitCell"><span>Zelle teilen</span></button>
+        </div>
+        <div class="gname">Zusammenführen</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <span class="split">
+            <button class="ib colorbtn" data-cmd="cellShade" title="Zellschattierung"><span class="cl" id="cellShadeInd" style="background:#fff2cc"></span><span class="gl" data-ic="bucket"></span></button><button class="ib arrow" data-pop="cellShade">▾</button>
+          </span>
+          <button class="big" data-cmd="tblBorders" data-ic="grid"><span>Rahmenlinien</span></button>
+          <select id="cellValign" class="casesel" title="Vertikale Ausrichtung">
+            <option value="">Vertikal…</option><option value="top">Oben</option><option value="middle">Mitte</option><option value="bottom">Unten</option>
+          </select>
+          <button class="big" data-cmd="tblAutoFit" data-ic="fit"><span>Automatisch anpassen</span></button>
+        </div>
+        <div class="gname">Format</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Lineal -->
+  <div id="rulerbar"><div id="ruler"></div></div>
+
+  <!-- Arbeitsbereich -->
+  <main id="workspace">
+    <div id="findbar" hidden>
+      <div class="frow">
+        <input id="findInput" type="text" placeholder="Suchen…" autocomplete="off">
+        <span id="findCount" class="muted"></span>
+        <button class="ib" data-cmd="findPrev" title="Vorheriger Treffer (Umschalt+Enter)">▲</button>
+        <button class="ib" data-cmd="findNext" title="Nächster Treffer (Enter)">▼</button>
+        <button class="ib" data-cmd="findClose" title="Schließen (Esc)">✕</button>
+      </div>
+      <div class="frow">
+        <input id="replaceInput" type="text" placeholder="Ersetzen durch…" autocomplete="off">
+        <button class="txt" data-cmd="replaceOne">Ersetzen</button>
+        <button class="txt" data-cmd="replaceAll">Alle ersetzen</button>
+      </div>
+      <label class="chk"><input type="checkbox" id="findCase"> Groß-/Kleinschreibung</label>
+    </div>
+
+    <div id="scroll">
+      <div id="pages">
+        <div id="sheet">
+          <div id="hdr" class="hf" contenteditable="true" spellcheck="true" data-label="Kopfzeile" hidden></div>
+          <div id="doc" contenteditable="true" spellcheck="true" lang="de"></div>
+          <div id="ftr" class="hf" contenteditable="true" spellcheck="true" data-label="Fußzeile" hidden></div>
+          <div id="imgbox" hidden contenteditable="false">
+            <div id="imgbar">
+              <button data-img="25">25 %</button><button data-img="50">50 %</button><button data-img="75">75 %</button><button data-img="100">100 %</button>
+              <span class="sep"></span>
+              <button data-img="left" data-ic="alignl"></button><button data-img="center" data-ic="alignc"></button><button data-img="right" data-ic="alignr"></button>
+              <span class="sep"></span>
+              <button data-img="alt" title="Alternativtext">Alt</button>
+              <button data-img="del" data-ic="trash" title="Bild löschen"></button>
+            </div>
+            <div id="imghandle"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="status">
+    <span id="st-page">Seite 1 von 1</span>
+    <span id="st-words">0 Wörter</span>
+    <span id="st-chars">0 Zeichen</span>
+    <span id="st-lang">Deutsch</span>
+    <span class="spacer"></span>
+    <button class="ib" data-cmd="zoomOut">−</button>
+    <input type="range" id="zoomRange" min="25" max="300" step="5" value="100" aria-label="Zoom">
+    <button class="ib" data-cmd="zoomIn">+</button>
+    <span id="st-zoom">100 %</span>
+  </footer>
+</div>
+
+<div id="popup" class="popup" hidden></div>
+<div id="toast" hidden></div>
+<div id="modal" hidden><div id="dialog" role="dialog" aria-modal="true"><h2 id="dtitle"></h2><div id="dbody"></div><div id="dbtns"></div></div></div>
+<div id="dropzone" hidden>Datei hier ablegen, um sie zu öffnen</div>
+<input type="file" id="fileOpen" accept=".docx,.html,.htm,.txt,.md" hidden>
+<input type="file" id="fileImage" accept="image/*" hidden>
+<input type="file" id="fileInsertInput" accept=".docx,.html,.htm,.txt,.md" hidden>
+
+<script src="lib/jszip.min.js"></script>
+<script src="docx.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
