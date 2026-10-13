@@ -109,6 +109,7 @@
       if (t === 'historyUndo') { e.preventDefault(); W.history.undo(); return; }
       if (t === 'historyRedo') { e.preventDefault(); W.history.redo(); return; }
       // Art der Eingabe wechselt (Tippen -> Löschen -> Enter): vorherigen Schritt abschließen
+      if (t === 'insertText' && e.data && e.data.length === 1 && AC.enabled() && AC.handle(e)) { e.preventDefault(); return; }
       const k = kindOf(t);
       if (k !== lastKind || k === 'struct' || k === 'other') W.history.flush();
       lastKind = k;
@@ -203,6 +204,73 @@
     }, { passive: false });
   }
 
+  /* ------------------------------------------------------------------ */
+  /*  AutoKorrektur / AutoFormat beim Tippen                              */
+  /* ------------------------------------------------------------------ */
+  const AC = {
+    enabled() { try { return localStorage.getItem('wohni.autocorrect') !== '0'; } catch (e) { return true; } },
+    prevChar() {
+      const s = getSelection();
+      if (!s.rangeCount || !s.isCollapsed) return null;
+      const r = s.getRangeAt(0);
+      const el = r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement;
+      const blk = el && el.closest('p,h1,h2,h3,h4,h5,h6');
+      if (!blk || !W.el.flow.contains(blk)) return null;
+      const t = document.createRange();
+      t.setStart(blk, 0); t.setEnd(r.startContainer, r.startOffset);
+      return t.toString().replace(/\u200B/g, '');
+    },
+    replaceBefore(n, text) {
+      for (let i = 0; i < n; i++) document.execCommand('delete');
+      document.execCommand('insertText', false, text);
+    },
+    /** true = Eingabe wurde ersetzt */
+    handle(e) {
+      const ch = e.data;
+      const pre = AC.prevChar();
+      if (pre == null || !W.el.flow.contains(getSelection().anchorNode)) return false;
+      const lang = (W.el.flow.lang || 'de').slice(0, 2);
+      const last = pre.slice(-1);
+      const opening = pre === '' || /[\s(\[{\u2013\u2014\u201E\u201A\u00AB]$/.test(pre);
+      if (ch === '"' && (lang === 'de' || lang === 'en')) { document.execCommand('insertText', false, lang === 'de' ? (opening ? '\u201E' : '\u201C') : (opening ? '\u201C' : '\u201D')); return true; }
+      if (ch === "'" && (lang === 'de' || lang === 'en')) {
+        const t = lang === 'de' ? (opening ? '\u201A' : (/[\p{L}\p{N}]$/u.test(pre) ? '\u2019' : '\u2018')) : (opening ? '\u2018' : '\u2019');
+        document.execCommand('insertText', false, t); return true;
+      }
+      if (ch === '-' && last === '-' && !/--$/.test(pre)) { AC.replaceBefore(1, '\u2013'); return true; }
+      if (ch === '.' && /[^.]\.\.$/.test(' ' + pre.slice(-3)) && pre.slice(-2) === '..') { AC.replaceBefore(2, '\u2026'); return true; }
+      if (ch === ')') {
+        const m = /\((c|r|tm)$/i.exec(pre);
+        if (m) { AC.replaceBefore(m[0].length, { c: '\u00A9', r: '\u00AE', tm: '\u2122' }[m[1].toLowerCase()]); return true; }
+      }
+      return false;
+    },
+    /** "- " / "* " / "1. " am Absatzanfang → Liste */
+    autoList() {
+      const flow = W.el.flow;
+      const r = W.sel.range(flow);
+      if (!r || !r.collapsed) return false;
+      const el = r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement;
+      const blk = el && el.closest('p');
+      if (!blk || blk.hasAttribute('data-list') || blk.hasAttribute('data-cont') || blk.classList.contains('brk')) return false;
+      const pre = AC.prevChar();
+      const all = blk.textContent.replace(/\u200B/g, '');
+      if (pre == null || pre !== all || !pre) return false;
+      let type = null, fmt = null, start = 1;
+      if (/^[-*\u2022\u2013]$/.test(pre)) { type = 'b'; fmt = 'disc'; }
+      else { const m = /^(\d{1,3})([.)])$/.exec(pre); if (m) { type = 'n'; fmt = m[2] === ')' ? 'paren' : 'decimal'; start = parseInt(m[1], 10); } }
+      if (!type) return false;
+      W.edit(() => {
+        blk.innerHTML = '<br>';
+        W.lists.set(blk, type, 0, type === 'n' ? W.uid('l') : null, fmt);
+        if (start !== 1) blk.setAttribute('data-start', String(start));
+      });
+      W.sel.caretIn(blk, true);
+      return true;
+    },
+  };
+  W.autocorrect = AC;
+
   /** Nach Enter: Überschrift → neuer Absatz im Standardformat */
   function fixAfterEnter(e) {
     if (e.inputType !== 'insertParagraph') return;
@@ -232,6 +300,7 @@
 
   function onKey(e) {
     if (e.defaultPrevented) return;
+    if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey && AC.enabled() && AC.autoList()) { e.preventDefault(); return; }
     // Listen und Tabellen haben Vorrang
     if (W.lists.onKeydown(e)) return;
     if (W.tables.onKeydown(e)) return;

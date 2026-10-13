@@ -112,6 +112,7 @@
       mt: num(cs.marginTop), mb: num(cs.marginBottom), ml: num(cs.marginLeft), mr: num(cs.marginRight),
       table: b.tagName === 'TABLE',
       brk: b.classList.contains('brk') ? b.getAttribute('data-brk') : null,
+      pbb: b.hasAttribute('data-pbb'),
       keep: /^H[1-6]$/.test(b.tagName) || b.hasAttribute('data-keep'),
       ctxKey: b.hasAttribute('data-ctx') ? b.tagName + '|' + b.className : null,
       fs: num(cs.fontSize),
@@ -376,6 +377,7 @@
       sv('--base-after', bs.after != null ? bs.after + 'pt' : null); sv('--base-ls', bs.ls != null ? String(bs.ls) : null);
     }
     if (pagesEl._font !== fam) { pagesEl._font = fam; if (fam) { pagesEl.style.setProperty('--font-body', fam); pagesEl.style.setProperty('--font-head', fam); } else { pagesEl.style.removeProperty('--font-body'); pagesEl.style.removeProperty('--font-head'); } }
+    flow.style.hyphens = doc.hyphens ? 'auto' : 'manual';
     flow.style.left = G.ml + 'px';
     flow.style.width = G.cw + 'px';
     const prevTransform = pagesEl.style.transform;
@@ -497,6 +499,8 @@
       }
 
       guardCount = 0;
+      // "Seitenumbruch davor" (Absatzeigenschaft)
+      if (inf.pbb && !web && !(cur.empty && si === 0)) newPage();
       for (;;) {
         const seg = cur;
         const h = heightAt(inf, seg.w);

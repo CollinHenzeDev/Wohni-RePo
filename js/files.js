@@ -39,12 +39,14 @@
   Fi.openFile = async function (file, handle, opts) {
     opts = opts || {};
     if (!opts.skipConfirm && !(await confirmDiscard())) return;
+    Fi.lastSkipped = 0;
     const name = file.name || 'Dokument';
     try {
       W.toast('„' + name + '“ wird geöffnet …', 1800);
       if (/\.(docx|dotx|docm)$/i.test(name) || file.type.includes('wordprocessingml')) {
         const buf = await file.arrayBuffer();
         const r = await W.docx.import(buf, name);
+        Fi.lastSkipped = r.skipped || 0;
         r.doc.floats = await W.docx.finalizeFloats(r.floats);
         W.loadDocument(r.doc, r.html, { handle: handle || null, noFocus: false });
         if (W.floats.resolvePending()) { W.layout.run(); W.history.reset(); }
@@ -64,7 +66,7 @@
         W.fileName = null; W.fileHandle = null;
       }
       W.dirty = false; W.emit('saved');
-      W.toast('„' + name + '“ geöffnet');
+      W.toast('„' + name + '“ geöffnet' + (Fi.lastSkipped ? ` – ${Fi.lastSkipped} Element${Fi.lastSkipped === 1 ? '' : 'e'} konnte${Fi.lastSkipped === 1 ? '' : 'n'} nicht gelesen werden` : ''), Fi.lastSkipped ? 6000 : 3200);
     } catch (e) {
       console.error(e);
       W.ui.dialog({ title: 'Datei konnte nicht geöffnet werden', width: 440, body: h('p', e.message || String(e)) });

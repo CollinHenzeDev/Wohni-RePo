@@ -324,7 +324,7 @@
 
   function buildInsert() {
     return [
-      group('Seiten', [btn({ icon: 'blankpage', label: 'Leere Seite', size: 'lg', tip: 'Leere Seite einfügen', cmd: 'blankPage' }), btn({ icon: 'pagebreak', label: 'Seitenumbruch', size: 'lg', tip: tip('Seitenumbruch', M + 'Eingabe'), cmd: 'pageBreak' })]),
+      group('Seiten', [btn({ icon: 'cover', label: 'Deckblatt', size: 'lg', tip: 'Deckblatt einfügen', menu: () => [{ icon: 'cover', label: 'Klassisch', fn: () => W.cmd.coverPage('classic') }, { icon: 'cover', label: 'Seitenband', fn: () => W.cmd.coverPage('band') }, { icon: 'cover', label: 'Farbfläche', fn: () => W.cmd.coverPage('block') }, { sep: true }, { icon: 'trash', label: 'Deckblatt entfernen', fn: () => W.cmd.removeCover() }] }), btn({ icon: 'blankpage', label: 'Leere Seite', size: 'lg', tip: 'Leere Seite einfügen', cmd: 'blankPage' }), btn({ icon: 'pagebreak', label: 'Seitenumbruch', size: 'lg', tip: tip('Seitenumbruch', M + 'Eingabe'), cmd: 'pageBreak' })]),
       group('Tabellen', [btn({ icon: 'table', label: 'Tabelle', size: 'lg', tip: 'Tabelle einfügen', menu: () => [{ node: tableGrid() }, { sep: true }, { icon: 'table', label: 'Tabelle einfügen…', fn: () => W.dialogs.table() }] })]),
       group('Illustrationen', [
         btn({ icon: 'picture', label: 'Bilder', size: 'lg', tip: 'Bild von diesem Gerät einfügen', menu: () => [{ icon: 'picture', label: 'Bild im Text einfügen…', fn: () => W.cmd.pickImage('inline') }, { icon: 'wrapBehind', label: 'Bild hinter den Text legen…', fn: () => W.cmd.pickImage('behind') }, { icon: 'wrapFront', label: 'Bild vor den Text legen…', fn: () => W.cmd.pickImage('front') }] }),
@@ -371,6 +371,7 @@
         btn({ icon: 'pagesize', label: 'Größe', size: 'lg', menu: sizeMenu }),
         btn({ icon: 'cols2', label: 'Spalten', size: 'lg', tip: 'Spalten (Links/Rechts: ungleich breite Spalten für Lebensläufe)', menu: columnsMenu }),
         btn({ icon: 'break', label: 'Umbrüche', size: 'lg', menu: breaksMenu }),
+        btn({ icon: 'alignJustify', label: 'Silbentrennung', size: 'lg', tip: 'Silbentrennung', menu: () => [{ label: 'Keine', checked: !W.doc.hyphens, fn: () => W.cmd.hyphenation(false) }, { label: 'Automatisch', checked: !!W.doc.hyphens, fn: () => W.cmd.hyphenation(true) }] }),
       ], { launcher: () => W.dialogs.pageSetup(), launcherTip: 'Seite einrichten' }),
       group('Absatz', [col(
         row(field('Einzug links', numInput({ value: 0, step: 0.1, min: 0, tip: 'Einzug links (cm)', key: 'indentLeft', onChange: (v) => W.cmd.indentLeft(v) })), field('Abstand vor', numInput({ value: 0, step: 1, min: 0, tip: 'Abstand vor (pt)', key: 'spaceBefore', onChange: (v) => W.cmd.spaceBefore(v) }))),
@@ -446,6 +447,7 @@
         btn({ icon: 'outline', label: 'Linienstärke', tip: 'Konturstärke und Linienart', menu: outlineWeightMenu, showLabel: true }),
         btn({ icon: 'effects', label: 'Schatten', toggle: 'objshadow', fn: () => { const f = sel(); if (f) W.floats.update({ shadow: !f.shadow }); }, showLabel: true }),
       ]),
+      group('Bild', [btn({ icon: 'picture', label: 'Bildform', size: 'lg', tip: 'Bild zu einer Form zuschneiden', cls: 'imageonly', menu: () => [{ label: 'Rechteck', fn: () => W.cmd.pictureShape('rect') }, { label: 'Abgerundetes Rechteck', fn: () => W.cmd.pictureShape('round') }, { label: 'Kreis / Ellipse (z. B. für Fotos)', fn: () => W.cmd.pictureShape('ellipse') }] })], { cls: 'imageonly' }),
       group('Anordnen', [
         btn({ icon: 'wrapSquare', label: 'Textumbruch', size: 'lg', tip: 'Textumbruch: Hinter den Text, Vor den Text, Quadrat …', menu: wrapMenu, cls: 'wraphl' }),
         col(btn({ icon: 'bringFront', label: 'Nach vorne', fn: () => W.floats.bringToFront(), showLabel: true }), btn({ icon: 'sendBack', label: 'Nach hinten', fn: () => W.floats.sendToBack(), showLabel: true }), btn({ icon: 'alignObjs', label: 'Ausrichten', menu: objAlignMenu, showLabel: true })),
@@ -652,6 +654,8 @@
       const fl = W.floats.selected && W.floats.selected.float;
       const isShape = !!fl && (fl.kind === 'shape' || fl.kind === 'textbox');
       W.$$('.shapeonly', W.el.ribbon).forEach((b) => { b.style.display = isShape ? '' : 'none'; });
+      const isImg = !!(fl ? fl.kind === 'image' : f && f.inline);
+      W.$$('.imageonly', W.el.ribbon).forEach((b) => { b.style.display = isImg ? '' : 'none'; });
       const tab = W.$('.tab[data-id="obj"]');
       if (tab) tab.textContent = fl ? (fl.kind === 'image' ? 'Bildformat' : fl.kind === 'textbox' ? 'Textfeldformat' : 'Formformat') : (f && f.inline ? 'Bildformat' : 'Formformat');
       if (fl) { set('objw', u.px2cm(fl.w).toFixed(2)); set('objh', u.px2cm(fl.h).toFixed(2)); (R.colorBars || []).forEach((c) => { if (c.key === 'objfill' && c.set) c.set(fl.fill); if (c.key === 'objstroke' && c.set) c.set(fl.stroke); }); }
@@ -729,9 +733,11 @@
       case 'options': {
         const auto = h('input', { type: 'checkbox' }); auto.checked = W.files.autosaveEnabled();
         auto.addEventListener('change', () => W.files.setAutosave(auto.checked));
+        const ac = h('input', { type: 'checkbox' }); ac.checked = W.autocorrect.enabled();
+        ac.addEventListener('change', () => { try { localStorage.setItem('wohni.autocorrect', ac.checked ? '1' : '0'); } catch (e) { /* */ } });
         const dark = h('input', { type: 'checkbox' }); dark.checked = document.body.classList.contains('dark');
         dark.addEventListener('change', () => W.cmd.toggleDark());
-        c.append(h('h1', 'Optionen'), h('label.fcheck.opt', auto, ' Dokument automatisch im Browser zwischenspeichern (Wiederherstellung nach Absturz)'), h('label.fcheck.opt', dark, ' Dunkles Erscheinungsbild'),
+        c.append(h('h1', 'Optionen'), h('label.fcheck.opt', auto, ' Dokument automatisch im Browser zwischenspeichern (Wiederherstellung nach Absturz)'), h('label.fcheck.opt', ac, ' AutoKorrektur beim Tippen (typografische Anführungszeichen, Gedankenstrich, Auslassungspunkte, „- “ und „1. “ erzeugen Listen)'), h('label.fcheck.opt', dark, ' Dunkles Erscheinungsbild'),
           h('p', h('button.dbtn', { type: 'button', onclick: () => W.dialogs.shortcuts() }, 'Tastenkürzel'), ' ', h('button.dbtn', { type: 'button', onclick: () => W.dialogs.about() }, 'Info')));
         break;
       }

@@ -52,6 +52,51 @@
     });
   };
 
+  /* ---------- Silbentrennung ---------- */
+  C.hyphenation = (on) => W.edit(() => { W.doc.hyphens = !!on; });
+
+  /* ---------- Deckblatt ---------- */
+  C.coverPage = function (kind) {
+    W.edit(() => {
+      const flow = W.el.flow;
+      flow.querySelectorAll('[data-cover]').forEach((e) => e.remove());
+      W.doc.floats = W.doc.floats.filter((f) => !f.cover);
+      const G = W.geom();
+      const mk = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return Array.from(t.content.children); };
+      let html = '', floats = [];
+      const brk = '<p class="brk" data-brk="page" contenteditable="false"><br></p>';
+      const D = new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+      if (kind === 'classic') {
+        html = '<p class="s-title" style="margin-top:170pt;text-align:center;font-size:36pt">Titel des Dokuments</p><p style="text-align:center;border-top:2px solid #2f5496;width:40%;margin:12pt auto"></p><p class="s-subtitle" style="text-align:center;font-size:16pt">Untertitel</p><p style="text-align:center;margin-top:140pt">Autor/in</p><p style="text-align:center">' + D + '</p>' + brk;
+      } else if (kind === 'band') {
+        floats.push(W.floats.create('shape', { shape: 'rect', name: 'Seitenband', x: 0, y: 0, w: G.pw * 0.22, h: G.ph, fill: '#1f3a5f', stroke: null, strokeW: 0, wrap: 'behind', page: 0, cover: true }));
+        html = '<p class="s-title" style="margin-top:200pt;margin-left:' + Math.round(G.pw * 0.2) + 'px;font-size:36pt;color:#1f3a5f"><b>Titel des Dokuments</b></p><p class="s-subtitle" style="margin-left:' + Math.round(G.pw * 0.2) + 'px;font-size:16pt">Untertitel</p><p style="margin-left:' + Math.round(G.pw * 0.2) + 'px;margin-top:180pt">Autor/in · ' + D + '</p>' + brk;
+      } else {
+        floats.push(W.floats.create('shape', { shape: 'rect', name: 'Farbfläche', x: 0, y: 0, w: G.pw, h: G.ph * 0.42, fill: '#2f5496', stroke: null, strokeW: 0, wrap: 'behind', page: 0, cover: true }));
+        html = '<p class="s-title" style="margin-top:70pt;font-size:38pt;color:#ffffff"><b>Titel des Dokuments</b></p><p class="s-subtitle" style="font-size:16pt;color:#dce6f7">Untertitel</p><p style="margin-top:300pt">Autor/in · ' + D + '</p>' + brk;
+      }
+      const blocks = mk(html);
+      const first = flow.firstChild;
+      blocks.forEach((b) => { b.setAttribute('data-cover', '1'); flow.insertBefore(b, first); });
+      floats.forEach((f) => W.doc.floats.unshift(f));
+    });
+    W.view.scrollToPage(0);
+  };
+  C.removeCover = function () {
+    W.edit(() => { W.el.flow.querySelectorAll('[data-cover]').forEach((e) => e.remove()); W.doc.floats = W.doc.floats.filter((f) => !f.cover); });
+  };
+
+  /* ---------- Bildform (Zuschneiden zur Form) ---------- */
+  C.pictureShape = function (kind) {
+    const s = W.floats.selected; if (!s) return;
+    const r = kind === 'ellipse' ? '50%' : kind === 'round' ? 18 : 0;
+    if (s.inline) {
+      W.layout.beginEdit();
+      s.inline.style.borderRadius = r ? (typeof r === 'string' ? r : r + 'px') : '';
+      W.layout.schedule(true); W.history.push(); W.floats.renderSel();
+    } else W.floats.update({ radius: r });
+  };
+
   /* ---------- Leere Seite ---------- */
   C.blankPage = function () {
     W.fmt.insertBreak('page');

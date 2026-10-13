@@ -420,13 +420,14 @@
     const ls = F.select([['single', 'Einfach'], ['l115', '1,15 Zeilen'], ['l15', '1,5 Zeilen'], ['dbl', 'Doppelt'], ['mult', 'Mehrfach'], ['exact', 'Genau (pt)']], lsKind);
     const lsv = F.num(lsVal, { w: 70, step: 0.05 });
     const keep = F.check('Absatz nicht vom nächsten trennen', blk.getAttribute('data-keep') === '1' || /^H[1-6]$/.test(blk.tagName));
+    const pbb = F.check('Seitenumbruch davor', blk.hasAttribute('data-pbb'));
     ui.dialog({
       title: 'Absatz', width: 500,
       body: h('div',
         h('fieldset', h('legend', 'Allgemein'), F.row('Ausrichtung:', align)),
         h('fieldset', h('legend', 'Einzug (cm)'), F.row('Links:', il, h('span.sp'), 'Rechts:', ir), F.row('Besonders:', special, ' Um: ', sv)),
         h('fieldset', h('legend', 'Abstand'), F.row('Vor (pt):', sb, h('span.sp'), 'Nach (pt):', sa), F.row('Zeilenabstand:', ls, ' Wert: ', lsv)),
-        keep.el),
+        keep.el, pbb.el),
       buttons: [{ label: 'Abbrechen' }, {
         label: 'OK', primary: true, onClick: () => {
           setTimeout(() => {
@@ -442,6 +443,7 @@
             const k = ls.value;
             if (k === 'exact') W.fmt.setLineSpacing({ exact: +lsv.value || 14 });
             else W.fmt.setLineSpacing({ single: 1, l115: 1.15, l15: 1.5, dbl: 2, mult: +lsv.value || 1.08 }[k]);
+            W.fmt.eachBlock((b) => { if (pbb.input.checked) b.setAttribute('data-pbb', '1'); else b.removeAttribute('data-pbb'); });
             W.fmt.eachBlock((b) => { if (keep.input.checked) b.setAttribute('data-keep', '1'); else if (/^H[1-6]$/.test(b.tagName)) b.setAttribute('data-keep', '0'); else b.removeAttribute('data-keep'); });
           }, 0);
         },

@@ -106,7 +106,7 @@
       files.push({ name: 'word/document.xml', data: docXml });
       files.push({ name: 'word/styles.xml', data: stylesXml(st) });
       files.push({ name: 'word/numbering.xml', data: numberingXml(st.nums) });
-      files.push({ name: 'word/settings.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings ${NS_DECL}><w:zoom w:percent="100"/>${doc.page.color && doc.page.color.toLowerCase() !== '#ffffff' ? '<w:displayBackgroundShape/>' : ''}<w:defaultTabStop w:val="708"/><w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>` });
+      files.push({ name: 'word/settings.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings ${NS_DECL}><w:zoom w:percent="100"/>${doc.page.color && doc.page.color.toLowerCase() !== '#ffffff' ? '<w:displayBackgroundShape/>' : ''}<w:defaultTabStop w:val="708"/>${doc.hyphens ? '<w:autoHyphenation/>' : ''}<w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>` });
       files.push({ name: 'word/fontTable.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:fonts ${NS_DECL}><w:font w:name="${X(base.font)}"/></w:fonts>` });
       hf.parts.forEach((p) => files.push(p));
       st.mediaFiles.forEach((m) => files.push({ name: 'word/media/' + m.name, data: m.data, store: true }));
@@ -294,6 +294,7 @@
     const list = el.getAttribute('data-list');
     if (el.getAttribute('data-keep') === '1' && !/^Heading/.test(sid)) ppr += '<w:keepNext/>';
     else if (el.getAttribute('data-keep') === '0' && /^Heading/.test(sid)) ppr += '<w:keepNext w:val="0"/>';
+    if (el.hasAttribute('data-pbb')) ppr += '<w:pageBreakBefore/>';
     if (list) {
       const lvl = Math.min(8, parseInt(el.getAttribute('data-lvl') || '0', 10));
       const fmt = el.getAttribute('data-fmt') || (list === 'b' ? 'disc' : 'decimal');
@@ -498,7 +499,7 @@
     return res;
   }
 
-  const graphicPic = (st, rid, cx, cy, name, id, extra) => `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${X(name)}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm${extra && extra.rot ? ` rot="${Math.round(extra.rot * 60000)}"` : ''}${extra && extra.flipH ? ' flipH="1"' : ''}><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="${extra && extra.ellipse ? 'ellipse' : 'rect'}"><a:avLst/></a:prstGeom>${extra && extra.stroke ? `<a:ln w="${emu(extra.strokeW || 1)}"><a:solidFill><a:srgbClr val="${hex6(extra.stroke)}"/></a:solidFill></a:ln>` : ''}</pic:spPr></pic:pic></a:graphicData></a:graphic>`;
+  const graphicPic = (st, rid, cx, cy, name, id, extra) => `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${X(name)}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm${extra && extra.rot ? ` rot="${Math.round(extra.rot * 60000)}"` : ''}${extra && extra.flipH ? ' flipH="1"' : ''}><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="${extra && extra.ellipse ? 'ellipse' : extra && extra.round ? 'roundRect' : 'rect'}"><a:avLst/></a:prstGeom>${extra && extra.stroke ? `<a:ln w="${emu(extra.strokeW || 1)}"><a:solidFill><a:srgbClr val="${hex6(extra.stroke)}"/></a:solidFill></a:ln>` : ''}</pic:spPr></pic:pic></a:graphicData></a:graphic>`;
 
   async function inlineImageXml(st, img) {
     const src = img.getAttribute('src');
@@ -509,7 +510,8 @@
     const w = parseFloat(img.getAttribute('width')) || parseFloat(img.style.width) || r.width || 100;
     const h = parseFloat(img.getAttribute('height')) || parseFloat(img.style.height) || r.height || 100;
     const id = st.docPrId++;
-    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${emu(w)}" cy="${emu(h)}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="Grafik ${id}" descr="${X(img.getAttribute('alt') || '')}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>${graphicPic(st, m.rid, emu(w), emu(h), m.name, id)}</wp:inline></w:drawing></w:r>`;
+    const ell = img.style.borderRadius === '50%';
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${emu(w)}" cy="${emu(h)}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="Grafik ${id}" descr="${X(img.getAttribute('alt') || '')}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>${graphicPic(st, m.rid, emu(w), emu(h), m.name, id, ell ? { ellipse: true } : null)}</wp:inline></w:drawing></w:r>`;
   }
 
   /** Verankertes freies Objekt → Lauf mit wp:anchor */
@@ -526,7 +528,7 @@
     if (f.kind === 'image') {
       const m = await mediaFor(st, f.src);
       if (!m) return '';
-      graphic = graphicPic(st, m.rid, cx, cy, m.name, id, { rot: f.rot, flipH: f.flipH, ellipse: String(f.radius) === '50%', stroke: f.stroke, strokeW: f.strokeW });
+      graphic = graphicPic(st, m.rid, cx, cy, m.name, id, { rot: f.rot, flipH: f.flipH, ellipse: String(f.radius) === '50%', round: !!f.radius && String(f.radius) !== '50%', stroke: f.stroke, strokeW: f.strokeW });
     } else graphic = await shapeGraphic(st, f, cx, cy);
     return `<w:r><w:drawing><wp:anchor distT="${dist}" distB="${dist}" distL="${dist}" distR="${dist}" simplePos="0" relativeHeight="${z}" behindDoc="${behind ? 1 : 0}" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>${px}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>${py}</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${wrap}<wp:docPr id="${id}" name="${X(f.name || 'Objekt ' + id)}" descr="${X(f.alt || '')}"/><wp:cNvGraphicFramePr/>${graphic}</wp:anchor></w:drawing></w:r>`;
   }

@@ -133,6 +133,8 @@
     const numDoc = await xmlOf('word/numbering.xml');
     if (numDoc) parseNumbering(ctx, numDoc);
     const docXml = await xmlOf('word/document.xml');
+    const settingsDoc = await xmlOf('word/settings.xml');
+    if (settingsDoc && kid(settingsDoc.documentElement, 'autoHyphenation') && onoff(kid(settingsDoc.documentElement, 'autoHyphenation')) !== false) ctx.doc.hyphens = true;
     const fnDoc = await xmlOf('word/footnotes.xml');
     ctx.fnDoc = fnDoc;
 
@@ -158,7 +160,7 @@
 
     // aufräumen
     cleanup(root);
-    return { doc: ctx.doc, html: root.innerHTML, floats: ctx.floats };
+    return { doc: ctx.doc, html: root.innerHTML, floats: ctx.floats, skipped: ctx.skipped || 0 };
   };
 
   function normalizePath(p) {
@@ -404,6 +406,10 @@
   }
 
   async function convertBlockLevel(ctx, el, root) {
+    try { return await convertBlockLevelInner(ctx, el, root); }
+    catch (e) { ctx.skipped = (ctx.skipped || 0) + 1; console.warn('DOCX: Element übersprungen', el.localName, e); return []; }
+  }
+  async function convertBlockLevelInner(ctx, el, root) {
     switch (el.localName) {
       case 'p': { const blocks = await convertParagraph(ctx, el); blocks.forEach((b) => root.appendChild(b)); return blocks; }
       case 'tbl': { const t = await convertTable(ctx, el); if (t) root.appendChild(t); return [t]; }
@@ -532,6 +538,7 @@
       const el = document.createElement(tag);
       if (cls) el.className = cls;
       applyParaProps(ctx, el, eff, probe, tag, styleName);
+      if (pbbPending) { el.setAttribute('data-pbb', '1'); pbbPending = false; }
       cur = { el, container: el, empty: true };
       return cur;
     };
@@ -542,8 +549,7 @@
     };
     const ensure = () => cur || newPara();
 
-    // Seitenumbruch davor
-    if (eff.p.pageBreakBefore) out.push(makeBreak('page'));
+    let pbbPending = !!eff.p.pageBreakBefore;
 
     const ctxRun = { eff, probe, styleName, fieldStack: [], skipResult: 0, listFirst: true, isToc, tabs: (eff.p.tabs || []).filter((t) => t.val !== 'clear') };
     // Tabstopps von Vorlagenketten ansammeln
@@ -881,13 +887,13 @@
         }
         case 'drawing': case 'pict': case 'object': {
           flush();
-          if (W.docx.drawing) await W.docx.drawing(ctx, c, ctxRun);
+          try { if (W.docx.drawing) await W.docx.drawing(ctx, c, ctxRun); } catch (e) { ctx.skipped = (ctx.skipped || 0) + 1; console.warn('DOCX: Zeichnung übersprungen', e); }
           break;
         }
         case 'AlternateContent': {
           flush();
           const ch = kid(c, 'Choice') || kid(c, 'Fallback');
-          if (ch) for (const d of kids(ch)) if (d.localName === 'drawing' || d.localName === 'pict') { if (W.docx.drawing) await W.docx.drawing(ctx, d, ctxRun); }
+          if (ch) for (const d of kids(ch)) if (d.localName === 'drawing' || d.localName === 'pict') { try { if (W.docx.drawing) await W.docx.drawing(ctx, d, ctxRun); } catch (e) { ctx.skipped = (ctx.skipped || 0) + 1; console.warn('DOCX: Zeichnung übersprungen', e); } }
           break;
         }
         default: break;
