@@ -36,7 +36,10 @@
   C.columns = function (preset) {
     const p = W.COLUMN_PRESETS[preset]; if (!p) return;
     const cur = W.doc.cols;
-    C.applyColumns({ n: p.n, w: p.w.slice(), gap: cur.gap, rule: cur.rule, bg: (preset === 'one' ? [null, null, null] : cur.bg || [null, null, null]), bleed: cur.bleed, mainOnly: preset === 'one' ? false : cur.mainOnly, preset }, 'all');
+    const unequal = preset === 'left' || preset === 'right';
+    const hadBreak = !!W.el.flow.querySelector('p.brk[data-brk="column"]');
+    C.applyColumns({ n: p.n, w: p.w.slice(), gap: cur.n === 1 && unequal ? u.cm2px(1.0) : cur.gap, rule: cur.rule, bg: (preset === 'one' ? [null, null, null] : cur.bg || [null, null, null]), bleed: cur.bleed, mainOnly: unequal, preset }, 'all');
+    if (p.n > 1 && !hadBreak) W.toast('Tipp: Mit Strg+Umschalt+Eingabe (Spaltenumbruch) springst du in die nächste Spalte.', 5200);
   };
   C.applyColumns = function (cfg, scope) {
     if (scope === 'here') {

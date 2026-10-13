@@ -132,6 +132,12 @@
 .doc p[data-list][data-cont] { margin-left: calc(.5in + var(--lvl, 0) * .5in); }
 .doc p[data-split] { text-align-last: var(--tal, auto); }
 
+/* Tabulatoren */
+.doc .tabc { display: inline-block; white-space: pre; vertical-align: baseline; height: 0.9em; }
+.doc .tabc[data-lead="dot"] { background: radial-gradient(circle at 1px 82%, currentColor 0.55px, transparent 0.7px) repeat-x; background-size: 4px 100%; }
+.doc .tabc[data-lead="hyphen"] { background: linear-gradient(90deg, currentColor 3px, transparent 3px) repeat-x 0 78% / 6px 1px; }
+.doc .tabc[data-lead="underscore"] { border-bottom: 1px solid currentColor; }
+
 /* Inhaltsverzeichnis */
 .doc p[data-toc] { display: flex; align-items: baseline; gap: 4px; }
 .doc p[data-toc] .toctext { flex: 0 1 auto; }

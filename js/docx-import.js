@@ -241,6 +241,7 @@
         case 'pBdr': o.bdr = {}; kids(c).forEach((b) => { o.bdr[b.localName] = { val: A(b, 'val'), sz: A(b, 'sz'), space: A(b, 'space'), color: wColor(ctx, b) }; }); break;
         case 'keepNext': o.keepNext = onoff(c); break;
         case 'keepLines': o.keepLines = onoff(c); break;
+        case 'contextualSpacing': o.ctx = onoff(c); break;
         case 'pageBreakBefore': o.pageBreakBefore = onoff(c); break;
         case 'numPr': o.numPr = { numId: A(kid(c, 'numId'), 'val'), ilvl: A(kid(c, 'ilvl'), 'val') }; break;
         case 'outlineLvl': o.outlineLvl = A(c, 'val'); break;
@@ -629,6 +630,11 @@
     const bold = !!r.b, ital = !!r.i;
     if (bold !== probe.bold) st.fontWeight = bold ? 'bold' : 'normal';
     if (ital !== probe.italic) st.fontStyle = ital ? 'italic' : 'normal';
+    if (eff.li && p.rPr) {
+      // Aufzählungszeichen folgen der Absatzmarke
+      if (p.rPr.color && p.rPr.color !== 'auto') st.color = p.rPr.color;
+      if (p.rPr.sz) st.fontSize = (p.rPr.sz / 2) + 'pt';
+    }
     if (r.u && r.u !== 'none') st.textDecoration = 'underline';
     if (r.caps) st.textTransform = 'uppercase';
     if (r.smallCaps) st.fontVariant = 'small-caps';
@@ -673,6 +679,7 @@
       }
       if (any) { const sp2 = Math.max(...Object.values(p.bdr).map((b) => (b && +b.space) || 0)); if (sp2) st.padding = `${Math.min(8, sp2)}pt ${Math.min(8, sp2)}pt`; }
     }
+    if (p.ctx) el.setAttribute('data-ctx', '1');
     const isHead = /^h[1-6]$/.test(tag);
     if (isHead && p.keepNext === false) el.setAttribute('data-keep', '0');
     else if (!isHead && p.keepNext) el.setAttribute('data-keep', '1');
@@ -796,14 +803,20 @@
       if (ctxRun.skipResult > 0) { buf = ''; return; }
       const c = ctxRun.ensure();
       let target = c.container;
+      const addTxt = (host, t, cs2) => {
+        // Tab-Zeichen im Text → Tabulator-Element (wenn der Absatz eigene Tabstopps hat)
+        if (ctxRun.tabs.length && t.includes('\t')) {
+          t.split('\t').forEach((part, k) => { if (k > 0) host.appendChild(tabNode(ctxRun)); if (part) appendText(host, part, cs2); });
+        } else appendText(host, t, cs2);
+      };
       if (css || sup || sub) {
         let node = document.createElement('span');
         if (css) node.setAttribute('style', css);
         let outer = node;
         if (sup) { const e = document.createElement('sup'); e.appendChild(node); outer = e; } else if (sub) { const e = document.createElement('sub'); e.appendChild(node); outer = e; }
-        appendText(node, buf, css);
+        addTxt(node, buf, css);
         target.appendChild(outer);
-      } else appendText(target, buf, null);
+      } else addTxt(target, buf, null);
       c.empty = false; buf = '';
     };
     for (const c of kids(rEl)) {

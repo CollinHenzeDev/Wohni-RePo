@@ -106,7 +106,7 @@
       files.push({ name: 'word/document.xml', data: docXml });
       files.push({ name: 'word/styles.xml', data: stylesXml(st) });
       files.push({ name: 'word/numbering.xml', data: numberingXml(st.nums) });
-      files.push({ name: 'word/settings.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings ${NS_DECL}>${doc.page.color && doc.page.color.toLowerCase() !== '#ffffff' ? '<w:displayBackgroundShape/>' : ''}<w:zoom w:percent="100"/><w:defaultTabStop w:val="708"/><w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>` });
+      files.push({ name: 'word/settings.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings ${NS_DECL}><w:zoom w:percent="100"/>${doc.page.color && doc.page.color.toLowerCase() !== '#ffffff' ? '<w:displayBackgroundShape/>' : ''}<w:defaultTabStop w:val="708"/><w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>` });
       files.push({ name: 'word/fontTable.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:fonts ${NS_DECL}><w:font w:name="${X(base.font)}"/></w:fonts>` });
       hf.parts.forEach((p) => files.push(p));
       st.mediaFiles.forEach((m) => files.push({ name: 'word/media/' + m.name, data: m.data, store: true }));
@@ -344,8 +344,18 @@
       if (Math.abs(ti - probe.ti) > 0.8) ind.push(ti < 0 ? `w:hanging="${tw(-ti)}"` : `w:firstLine="${tw(ti)}"`);
       if (ind.length) ppr += `<w:ind ${ind.join(' ')}/>`;
     }
+    if (el.hasAttribute('data-ctx')) ppr += '<w:contextualSpacing/>';
     const al = cs.textAlign === 'start' ? 'left' : cs.textAlign === 'end' ? 'right' : cs.textAlign;
     if (al !== probe.align) ppr += `<w:jc w:val="${al === 'justify' ? 'both' : al === 'center' ? 'center' : al === 'right' ? 'right' : 'left'}"/>`;
+    if (list) {
+      // Aufzählungszeichen übernehmen Farbe/Größe der Absatzmarke
+      let mark = '';
+      const col = W.color.hex(cs.color) || '#000000';
+      if (col !== probe.color) mark += `<w:color w:val="${col.slice(1).toUpperCase()}"/>`;
+      const szPt = u.px2pt(fs);
+      if (Math.abs(szPt - probe.sizePt) > 0.25) mark += `<w:sz w:val="${Math.round(szPt * 2)}"/><w:szCs w:val="${Math.round(szPt * 2)}"/>`;
+      if (mark) ppr += `<w:rPr>${mark}</w:rPr>`;
+    }
     const pStyle = list && sid === 'Normal' ? 'ListParagraph' : sid;
     ppr = `<w:pStyle w:val="${opts.hf ? (opts.hf === 'header' ? 'Header' : 'Footer') : pStyle}"/>` + ppr;
     // Läufe
@@ -416,7 +426,7 @@
       const ecs = getComputedStyle(e);
       const dl = ecs.textDecorationLine || ecs.textDecoration || '';
       if (/underline/.test(dl)) decs.add('u'); if (/line-through/.test(dl)) decs.add('s');
-      if (!bg && e !== block) { const b = W.color.parse(ecs.backgroundColor); if (b && b.a > 0) bg = b; }
+      if (!bg && e !== block && !e.classList.contains('fld')) { const b = W.color.parse(ecs.backgroundColor); if (b && b.a >= 0.5) bg = b; }
       if (e === block) break;
     }
     const va = cs.verticalAlign;

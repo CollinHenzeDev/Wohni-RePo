@@ -36,6 +36,7 @@
   ui.menu = function (anchor, entries, opts) {
     opts = opts || {};
     if (!opts.sub) ui.closeMenus();
+    if (anchor && !anchor.isConnected) { W.el.overlays.appendChild(anchor); const a = anchor; setTimeout(() => a.remove(), 0); }
     const m = h('div.menu' + (opts.cls ? '.' + opts.cls : ''));
     if (opts.minWidth) m.style.minWidth = opts.minWidth + 'px';
     entries.forEach((e) => {
@@ -348,7 +349,7 @@
     const presetRow = h('div.presets.colpresets');
     Object.entries(W.COLUMN_PRESETS).forEach(([k, v]) => {
       const b = h('button.colpre', { type: 'button', title: v.label, html: W.icon({ one: 'cols1', two: 'cols2', three: 'cols3', left: 'colsLeft', right: 'colsRight' }[k], 34) + `<span>${v.label.split(' ')[0]}</span>` });
-      b.addEventListener('click', () => { state.n = v.n; state.w = v.w.slice(); if (k === 'left' || k === 'right') state.mainOnly = state.mainOnly; n.value = v.n; draw(); });
+      b.addEventListener('click', () => { state.n = v.n; state.w = v.w.slice(); mainOnly.input.checked = (k === 'left' || k === 'right'); n.value = v.n; draw(); });
       presetRow.appendChild(b);
     });
     function draw() {

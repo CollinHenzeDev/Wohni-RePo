@@ -84,13 +84,14 @@
 
     set(p, type, lvl, lid, fmt) {
       p.setAttribute('data-list', type);
+      p.setAttribute('data-ctx', '1');
       p.setAttribute('data-lvl', String(lvl || 0));
       p.style.setProperty('--lvl', String(lvl || 0));
       if (type === 'n') p.setAttribute('data-lid', lid || W.uid('l')); else p.removeAttribute('data-lid');
       p.setAttribute('data-fmt', fmt || (type === 'b' ? 'disc' : 'decimal'));
     },
     clear(p) {
-      ['data-list', 'data-lvl', 'data-lid', 'data-fmt', 'data-mark', 'data-start'].forEach((a) => p.removeAttribute(a));
+      ['data-list', 'data-lvl', 'data-lid', 'data-fmt', 'data-mark', 'data-start', 'data-ctx'].forEach((a) => p.removeAttribute(a));
       p.style.removeProperty('--lvl');
       p.style.removeProperty('margin-left'); p.style.removeProperty('text-indent');
       if (!p.getAttribute('style')) p.removeAttribute('style');

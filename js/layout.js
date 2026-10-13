@@ -74,6 +74,10 @@
       node = next;
     }
     if (!flow.firstChild) { const p = document.createElement('p'); p.appendChild(document.createElement('br')); flow.appendChild(p); changed = true; }
+    // Vor/hinter einer Tabelle am Dokumentrand muss ein Absatz stehen, sonst kann der Cursor dort nicht hin
+    const edgeP = () => { const p = document.createElement('p'); p.appendChild(document.createElement('br')); return p; };
+    if (flow.firstElementChild && flow.firstElementChild.tagName === 'TABLE') { flow.insertBefore(edgeP(), flow.firstChild); changed = true; }
+    if (flow.lastElementChild && flow.lastElementChild.tagName === 'TABLE') { flow.appendChild(edgeP()); changed = true; }
     // Tabellenzellen brauchen Absätze
     flow.querySelectorAll('td,th').forEach((c) => {
       if (!c.querySelector(':scope > p, :scope > h1, :scope > h2, :scope > h3, :scope > table')) {
@@ -109,6 +113,7 @@
       table: b.tagName === 'TABLE',
       brk: b.classList.contains('brk') ? b.getAttribute('data-brk') : null,
       keep: /^H[1-6]$/.test(b.tagName) || b.hasAttribute('data-keep'),
+      ctxKey: b.hasAttribute('data-ctx') ? b.tagName + '|' + b.className : null,
       fs: num(cs.fontSize),
       lh: cs.lineHeight === 'normal' ? num(cs.fontSize) * 1.25 : num(cs.lineHeight),
     };
@@ -409,7 +414,7 @@
       cg.forEach((c, ci) => {
         if (mainIdx >= 0 && pg > 0 && ci !== mainIdx) return;
         splitByObstacles(obs, G.ml + c.x, c.w, top, bottomY).forEach((s) => {
-          out.push({ page: pg, col: ci, x: s.x, y: s.y, w: s.w, h: s.h, cursor: 0, prevMb: 0, empty: true, full: s.full });
+          out.push({ page: pg, col: ci, x: s.x, y: s.y, w: s.w, h: s.h, cursor: 0, prevMb: 0, prevKey: null, empty: true, full: s.full });
         });
       });
       return out;
@@ -438,6 +443,7 @@
       placements.push({ inf, page: seg.page, x: seg.x, y: seg.y + top, w: seg.w });
       seg.cursor = top + h;
       seg.prevMb = inf.mb;
+      seg.prevKey = inf.ctxKey;
       seg.empty = false;
       docStart = false;
     }
@@ -471,7 +477,8 @@
       for (;;) {
         const seg = cur;
         const h = heightAt(inf, seg.w);
-        const gap = seg.empty ? ((docStart && seg.page === 0) ? inf.mt : 0) : seg.prevMb + inf.mt;
+        // "Kein Abstand zwischen Absätzen gleicher Formatvorlage" (Listen)
+        const gap = seg.empty ? ((docStart && seg.page === 0) ? inf.mt : 0) : (inf.ctxKey && seg.prevKey === inf.ctxKey ? 0 : seg.prevMb + inf.mt);
         const top = seg.cursor + gap;
         let fits = top + h <= seg.h + 0.5;
 
@@ -572,6 +579,7 @@
     // Floats: Seitenindex begrenzen
     if (!web) doc.floats.forEach((f) => { if (f.page > pageCount - 1) f.page = pageCount - 1; });
 
+    updateTabs();
     const pageH = web ? Math.max(G.ph, webBottom + G.mb) : G.ph;
     L.info = { pageCount, G, web, pageH, placements: placements.length };
     L.G = G; L.pageH = pageH;
@@ -588,6 +596,49 @@
 
     if (saved && touched && flowFocused) W.sel.restore(saved, flow);
     W.emit('layout', L.info);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Tabulatoren: Breite jedes Tabulator-Zeichens bis zum nächsten Stopp */
+  /* ------------------------------------------------------------------ */
+  function updateTabs() {
+    const flow = W.el.flow;
+    flow.querySelectorAll('p[data-tabs]').forEach((p) => {
+      let stops;
+      try { stops = JSON.parse(p.getAttribute('data-tabs')); } catch (e) { return; }
+      stops.sort((a, b) => a.p - b.p);
+      const spans = Array.from(p.querySelectorAll('.tabc'));
+      if (!spans.length) return;
+      spans.forEach((s) => { s.style.width = ''; });
+      const cs = getComputedStyle(p);
+      const cell = p.closest('td,th');
+      const originOf = () => {
+        if (cell) { const cc = getComputedStyle(cell); return cell.getBoundingClientRect().left + parseFloat(cc.paddingLeft || 0) + parseFloat(cc.borderLeftWidth || 0); }
+        return p.getBoundingClientRect().left - (parseFloat(cs.marginLeft) || 0);
+      };
+      const origin = originOf();
+      spans.forEach((s, i) => {
+        const x0 = s.getBoundingClientRect().left - origin;
+        let stop = stops.find((t) => t.p > x0 + 1);
+        if (!stop) { const d = 48; stop = { p: (Math.floor(x0 / d) + 1) * d, a: 'l', l: '' }; }
+        // Text hinter dem Tabulator bis zum nächsten Tabulator
+        let tw = 0;
+        if (stop.a === 'r' || stop.a === 'c') {
+          const r = document.createRange();
+          r.setStartAfter(s);
+          const nx = spans[i + 1];
+          if (nx) r.setEndBefore(nx); else r.setEnd(p, p.childNodes.length);
+          const rc = r.getClientRects();
+          let left = Infinity, right = -Infinity;
+          for (const q of rc) { if (q.width > 0) { left = Math.min(left, q.left); right = Math.max(right, q.right); } }
+          tw = isFinite(left) ? right - left : 0;
+        }
+        let w = stop.a === 'r' ? stop.p - x0 - tw : stop.a === 'c' ? stop.p - x0 - tw / 2 : stop.p - x0;
+        w = Math.max(0, w);
+        s.style.width = w.toFixed(1) + 'px';
+        if (stop.l && stop.l !== 'none') s.setAttribute('data-lead', stop.l); else s.removeAttribute('data-lead');
+      });
+    });
   }
 
   /* ------------------------------------------------------------------ */

@@ -55,7 +55,8 @@
     W.emit('viewmode', mode);
   };
 
-  W.ui = {
+  W.ui = W.ui || {};
+  Object.assign(W.ui, {
     ensureCaretVisible() {
       const rc = W.sel.caretRect();
       if (!rc) return;
@@ -66,7 +67,7 @@
       if (rc.right > ws.right - 20) W.el.workspace.scrollLeft += rc.right - ws.right + 40;
       else if (rc.left < ws.left + 20) W.el.workspace.scrollLeft -= ws.left + 20 - rc.left;
     },
-  };
+  });
 
   /* ------------------------------------------------------------------ */
   /*  Dokument laden / neu                                                */
@@ -235,7 +236,11 @@
     if (W.tables.onKeydown(e)) return;
     if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
-      document.execCommand('insertText', false, '\t');
+      const sel = getSelection();
+      const el = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+      const blk = el && el.closest('p[data-tabs]');
+      if (blk) document.execCommand('insertHTML', false, '<span class="tabc">\t</span>');
+      else document.execCommand('insertText', false, '\t');
       return;
     }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

@@ -746,5 +746,46 @@
     }
   });
 
-  W.on('restored', () => { Fl.deselect(); nodes.forEach((n) => n.remove()); nodes.clear(); });
+  /* ------------------------------------------------------------------ */
+  /*  Kontextmenü (Rechtsklick) für Objekte                               */
+  /* ------------------------------------------------------------------ */
+  document.addEventListener('contextmenu', (ev) => {
+    const t = ev.target;
+    if (!t.closest || !t.closest('#pages')) return;
+    let hit = null;
+    if (t.tagName === 'IMG' && t.closest('#flow')) { Fl.selectInline(t); hit = 'inline'; }
+    else {
+      const f = floatAt(ev.clientX, ev.clientY, null);
+      if (f) { if (!Fl.selected || Fl.selected.id !== f.id) Fl.select(f.id); hit = 'float'; }
+      else if (t.closest('.fsel') && Fl.selected) hit = Fl.selected.inline ? 'inline' : 'float';
+    }
+    if (!hit) return;
+    ev.preventDefault();
+    const sel = Fl.selected && Fl.selected.float;
+    const wrapSub = [
+      { icon: 'wrapInline', label: 'Mit Text in Zeile', fn: () => W.cmd.wrap('inline'), checked: hit === 'inline' },
+      { icon: 'wrapSquare', label: 'Quadrat', fn: () => W.cmd.wrap('square'), checked: sel && sel.wrap === 'square' },
+      { icon: 'wrapTopBottom', label: 'Oben und unten', fn: () => W.cmd.wrap('topbottom'), checked: sel && sel.wrap === 'topbottom' },
+      { icon: 'wrapBehind', label: 'Hinter den Text', fn: () => W.cmd.wrap('behind'), checked: sel && sel.wrap === 'behind' },
+      { icon: 'wrapFront', label: 'Vor den Text', fn: () => W.cmd.wrap('front'), checked: sel && sel.wrap === 'front' },
+    ];
+    const items = [{ icon: 'wrapSquare', label: 'Textumbruch', sub: wrapSub }];
+    if (hit === 'float') {
+      items.push(
+        { icon: 'bringFront', label: 'In den Vordergrund', fn: () => Fl.bringToFront() }, { icon: 'sendBack', label: 'In den Hintergrund', fn: () => Fl.sendToBack() },
+        { icon: 'forward', label: 'Eine Ebene nach vorne', fn: () => Fl.bringForward() }, { icon: 'backward', label: 'Eine Ebene nach hinten', fn: () => Fl.sendBackward() },
+        { sep: true },
+        { icon: 'alignObjs', label: 'Ausrichten', sub: [
+          { label: 'Links an Seite', fn: () => Fl.align('left') }, { label: 'Horizontal zentrieren', fn: () => Fl.align('center') }, { label: 'Rechts an Seite', fn: () => Fl.align('right') },
+          { label: 'Oben an Seite', fn: () => Fl.align('top') }, { label: 'Vertikal zentrieren', fn: () => Fl.align('middle') }, { label: 'Unten an Seite', fn: () => Fl.align('bottom') }] },
+        { icon: 'rotate', label: 'Drehen', sub: [{ label: 'Um 90° nach rechts', fn: () => Fl.rotate(90) }, { label: 'Um 90° nach links', fn: () => Fl.rotate(-90) }, { label: 'Horizontal kippen', fn: () => Fl.flip('h') }, { label: 'Vertikal kippen', fn: () => Fl.flip('v') }] },
+      );
+      if (sel && (sel.kind === 'shape' || sel.kind === 'textbox')) items.push({ icon: 'textbox', label: 'Text bearbeiten', fn: () => Fl.editText(sel.id) });
+      items.push({ sep: true }, { icon: 'copy', label: 'Duplizieren', hint: 'Strg+D', fn: () => Fl.duplicate() }, { icon: 'info', label: 'Eigenschaften …', fn: () => W.dialogs.objectProps() });
+    }
+    items.push({ sep: true }, { icon: 'trash', label: 'Löschen', hint: 'Entf', fn: () => Fl.deleteSelected() });
+    W.ui.menu(W.h('span', { style: { position: 'fixed', left: ev.clientX + 'px', top: ev.clientY + 'px', width: '1px', height: '1px' } }), items, {});
+  });
+
+  W.on('restored', () => { Fl.deselect(); nodes.forEach((n) => n.remove()); nodes.clear(); if (W.layout.info && W.layout.G) Fl.render(); });
 })();

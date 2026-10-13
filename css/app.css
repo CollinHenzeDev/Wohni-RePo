@@ -296,12 +296,27 @@ body.col-resize #flow { cursor: col-resize; }
 #rulerbar { position: sticky; top: 0; z-index: 20; height: 22px; background: var(--ui-bg); border-bottom: 1px solid var(--ui-line); overflow: hidden; }
 #rulerbar .rulertrack { position: absolute; top: 3px; height: 16px; background: #fff; border: 1px solid #bbb; }
 #rulerbar .rmargin { position: absolute; top: 0; height: 100%; background: #c9c9c9; }
-#rulerbar .rtick { position: absolute; bottom: 0; width: 1px; height: 4px; background: #666; }
+#rulerbar .rtick { position: absolute; bottom: 1px; width: 1px; height: 4px; background: #666; }
 #rulerbar .rtick.big { height: 7px; }
+#rulerbar .rulertrack { overflow: visible; }
 #rulerbar .rnumber { position: absolute; top: 0; font-size: 9px; color: #444; transform: translateX(-50%); }
 #rulerbar .rhandle { position: absolute; top: 0; width: 8px; height: 100%; cursor: ew-resize; z-index: 2; }
 #rulerbar .rhandle::after { content: ""; position: absolute; left: 3px; top: 3px; width: 2px; bottom: 3px; background: var(--accent); opacity: .7; }
 
+#rulerbar .rcols { position: absolute; inset: 0; pointer-events: none; }
+#rulerbar .rgap { position: absolute; top: 0; height: 100%; background: #c9c9c9; opacity: .8; }
+#rulerbar .rtabs { position: absolute; inset: 0; }
+#rulerbar .rtab { position: absolute; top: 1px; width: 9px; height: 13px; font-size: 13px; line-height: 13px; font-weight: 700; text-align: left; cursor: pointer; color: #333; z-index: 3; }
+#rulerbar .rind { position: absolute; width: 9px; height: 8px; z-index: 4; cursor: ew-resize; }
+#rulerbar .rind.first { top: -3px; border: solid transparent; border-width: 0; }
+#rulerbar .rind.first::after { content: ""; position: absolute; left: 0; top: 0; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-top: 7px solid #2b579a; }
+#rulerbar .rind.hang { bottom: -3px; top: auto; }
+#rulerbar .rind.hang::after { content: ""; position: absolute; left: 0; top: 9px; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-bottom: 7px solid #2b579a; }
+#rulerbar .rind.hang::before { content: ""; position: absolute; left: 0; top: 16px; width: 9px; height: 3px; background: #2b579a; }
+#rulerbar .rind.right { top: 9px; }
+#rulerbar .rind.right::after { content: ""; position: absolute; left: 0; top: 0; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-bottom: 7px solid #2b579a; }
+#rulerbar .rind.first { top: 0; }
+#rulerbar .rtick, #rulerbar .rnumber { pointer-events: none; }
 /* ---- Meldungen ----------------------------------------------------------------------- */
 #toasts { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 .toast { background: #323232; color: #fff; padding: 9px 16px; border-radius: 6px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.35); transition: opacity .3s, transform .3s; max-width: 80vw; }

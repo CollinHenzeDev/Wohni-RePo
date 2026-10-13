@@ -187,10 +187,8 @@
       const top = web ? 0 : i * G.stride;
       const pg = h('div.printpage', { style: { width: G.pw + 'px', height: (pageH - 0.5) + 'px' } });
       const inner = pages.cloneNode(true);
-      inner.removeAttribute('id');
       inner.classList.add('print');
       inner.style.cssText = `position:absolute;left:0;top:${-top}px;width:${G.pw}px;height:${pages.style.height};transform:none`;
-      inner.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
       // Nur die eigene Seite: andere Blätter ausblenden
       Array.from(inner.querySelector('.sheet') ? inner.querySelectorAll('.sheet') : []).forEach((s, k) => { s.style.boxShadow = 'none'; if (k !== i) s.style.display = 'none'; });
       inner.querySelectorAll('.fsel').forEach((e) => e.remove());

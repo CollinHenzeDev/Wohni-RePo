@@ -8,6 +8,7 @@
   const META_SKIP = ['title', 'author'];
 
   function takeSnapshot() {
+    W.emit('sync');
     const meta = {};
     for (const k in W.doc) if (!META_SKIP.includes(k)) meta[k] = W.doc[k];
     return {
@@ -59,9 +60,9 @@
       const keep = { title: W.doc.title, author: W.doc.author };
       W.doc = Object.assign(W.defaultDoc(), JSON.parse(snap.meta), keep);
       W.el.flow.innerHTML = snap.html;
+      W.emit('restored');
       W.layout.run();
       if (snap.sel) { W.el.flow.focus({ preventScroll: true }); W.sel.restore(snap.sel, W.el.flow); }
-      W.emit('restored');
       W.markDirty();
       W.ui && W.ui.ensureCaretVisible && W.ui.ensureCaretVisible();
     } finally { H.restoring = false; }

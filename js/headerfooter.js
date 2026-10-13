@@ -141,6 +141,8 @@
     return true;
   };
 
+  W.on('sync', () => { if (HF.editing) HF.sync(); });
+
   HF.setDiffFirst = function (on) {
     W.doc.diffFirst = !!on;
     W.layout.run(); W.history.push();
