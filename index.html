@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wohni Writer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232b579a'/%3E%3Cpath d='M7 9h3l2.5 11L15 9h2l2.5 11L22 9h3l-4 15h-2.5L16 14l-2.500 10H11z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/doc.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <header id="titlebar"></header>
+  <nav id="tabs" role="tablist"></nav>
+  <div id="ribbon"></div>
+  <div id="main">
+    <aside id="navpane" hidden></aside>
+    <div id="workspace">
+      <div id="rulerbar" hidden></div>
+      <div id="zoomsizer">
+        <div id="pages">
+          <div id="sheets"></div>
+          <div id="layerBehind" class="layer"></div>
+          <div id="layerHF" class="layer"></div>
+          <div id="flow" class="doc" contenteditable="true" spellcheck="true" lang="de" autocorrect="on" role="textbox" aria-multiline="true" aria-label="Dokument"></div>
+          <div id="layerFront" class="layer"></div>
+          <div id="layerUI" class="layer"></div>
+        </div>
+      </div>
+    </div>
+    <aside id="sidepane" hidden></aside>
+  </div>
+  <footer id="statusbar"></footer>
+</div>
+<div id="backstage" hidden></div>
+<div id="overlays"></div>
+<input type="file" id="fileOpen" hidden accept=".docx,.dotx,.docm,.txt,.html,.htm,.md,.rtf">
+<input type="file" id="fileImage" hidden accept="image/*" multiple>
+<input type="file" id="fileInsert" hidden accept=".docx,.txt,.html,.htm">
+
+<script src="js/util.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/state.js"></script>
+<script src="js/selection.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/history.js"></script>
+<script src="js/lists.js"></script>
+<script src="js/format.js"></script>
+<script src="js/tables.js"></script>
+<script src="js/floats.js"></script>
+<script src="js/headerfooter.js"></script>
+<script src="js/zip.js"></script>
+<script src="js/docx-import.js"></script>
+<script src="js/docx-drawing.js"></script>
+<script src="js/docx-export.js"></script>
+<script src="js/files.js"></script>
+<script src="js/find.js"></script>
+<script src="js/dialogs.js"></script>
+<script src="js/templates.js"></script>
+<script src="js/commands.js"></script>
+<script src="js/ribbon.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

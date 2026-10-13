@@ -1,0 +1,196 @@
+/* ==========================================================================
+   Dokument-Darstellung (Seiten, Text, Tabellen, Listen, Objekte)
+   Wird von der Bearbeitungsansicht UND vom Druck verwendet.
+   ========================================================================== */
+
+:root {
+  --font-body: Calibri, Carlito, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-head: "Calibri Light", Carlito, Calibri, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --page-gap: 18px;
+}
+
+/* ---- Seitenstapel -------------------------------------------------------- */
+#pages {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+#sheets, .layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.layer { pointer-events: none; }
+#sheets { pointer-events: none; z-index: 0; }
+#layerBehind { z-index: 1; }
+#layerHF { z-index: 2; }
+#flow { z-index: 3; }
+#layerFront { z-index: 4; }
+#layerUI { z-index: 5; }
+
+.sheet {
+  position: absolute;
+  left: 0;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .12), 0 2px 8px rgba(0, 0, 0, .18);
+  overflow: hidden;
+}
+.sheet .colbg { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+.sheet .colrule { position: absolute; width: 0; pointer-events: none; border-left: 1px solid #888; }
+.sheet .wm {
+  position: absolute; left: 50%; top: 50%;
+  white-space: nowrap; pointer-events: none; user-select: none;
+  font-family: var(--font-body); font-weight: 700;
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+.sheet .pgborder { position: absolute; pointer-events: none; box-sizing: border-box; }
+
+/* ---- Fließtext ----------------------------------------------------------- */
+.doc, .hfbox, .tbtext {
+  font-family: var(--base-font, var(--font-body));
+  font-size: var(--base-size, 11pt);
+  line-height: calc(var(--ls, var(--base-ls, 1.08)) * 1.22);
+  color: #000;
+  white-space: pre-wrap;
+  tab-size: 48px;
+  -moz-tab-size: 48px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+#flow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100px;
+  height: 0;
+  outline: none;
+  caret-color: #000;
+  hyphens: manual;
+}
+#flow > * { box-sizing: border-box; }
+#flow > [data-lay] {
+  transform: translate(var(--lx, 0px), var(--ly, 0px));
+  max-width: var(--lw, none);
+}
+#flow > table[data-lay] { width: calc(var(--lw, 100%) * var(--tw, 1)); max-width: none; }
+.web #flow > table[data-lay] { width: calc(100% * var(--tw, 1)); }
+
+.doc p, .doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6,
+.hfbox p, .hfbox h1, .hfbox h2, .hfbox h3, .tbtext p, .tbtext h1, .tbtext h2, .tbtext h3 {
+  line-height: calc(var(--ls, var(--base-ls, 1.08)) * 1.22);
+}
+.doc p, .hfbox p, .tbtext p { margin: 0 0 var(--base-after, 8pt) 0; min-height: 1em; }
+.doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6,
+.hfbox h1, .hfbox h2, .hfbox h3, .tbtext h1, .tbtext h2, .tbtext h3 {
+  font-weight: normal; margin: 0; min-height: 1em;
+}
+.doc h1 { font-family: var(--font-head); font-size: 16pt; color: #2f5496; margin: 12pt 0 0 0; }
+.doc h2 { font-family: var(--font-head); font-size: 13pt; color: #2f5496; margin: 2pt 0 0 0; }
+.doc h3 { font-family: var(--font-head); font-size: 12pt; color: #1f3763; margin: 2pt 0 0 0; }
+.doc h4 { font-style: italic; color: #2f5496; margin: 2pt 0 0 0; }
+.doc h5 { color: #2f5496; margin: 2pt 0 0 0; }
+.doc h6 { color: #1f3763; margin: 2pt 0 0 0; }
+.doc p.s-title { font-family: var(--font-head); font-size: 28pt; --ls: 1; letter-spacing: -.5pt; margin: 0 0 0 0; }
+.doc p.s-subtitle { font-size: 11pt; color: #5a5a5a; letter-spacing: .75pt; margin: 0 0 8pt 0; }
+.doc p.s-quote { font-style: italic; color: #404040; text-align: center; margin: 10pt .6in 8pt .6in; }
+.doc p.s-iquote { font-style: italic; color: #4472c4; text-align: center; margin: 18pt .6in 18pt .6in;
+  border-top: 1px solid #4472c4; border-bottom: 1px solid #4472c4; padding: 10pt 0; }
+.doc p.s-nospace { margin: 0; --ls: 1; }
+.doc p.s-caption { font-size: 9pt; font-style: italic; color: #44546a; margin: 0 0 10pt 0; --ls: 1; }
+.doc p.s-toc1, .doc p.s-toc2, .doc p.s-toc3 { margin: 0 0 5pt 0; }
+.doc p.s-toc2 { margin-left: 11pt; }
+.doc p.s-toc3 { margin-left: 22pt; }
+.doc p.s-tochead { font-family: var(--font-head); font-size: 16pt; color: #2f5496; margin: 12pt 0 6pt 0; }
+.doc p.s-intense { font-weight: bold; color: #4472c4; }
+.doc p.s-code { font-family: Consolas, "Courier New", monospace; font-size: 10pt; background: #f2f2f2; margin: 0; }
+
+.doc a, .hfbox a, .tbtext a { color: #0563c1; text-decoration: underline; cursor: pointer; }
+.doc mark.find, #flow .find-hit { background: #ffe97a; color: inherit; }
+.doc .find-cur { background: #ff9632 !important; }
+
+/* Listen: Absatz-Attribute statt <ul>/<ol> */
+.doc p[data-list], .tbtext p[data-list] {
+  margin-left: calc(.5in + var(--lvl, 0) * .5in);
+  text-indent: calc(var(--hang, .25in) * -1);
+}
+.doc p[data-list]::before, .tbtext p[data-list]::before {
+  content: attr(data-mark);
+  display: inline-block;
+  width: var(--hang, .25in);
+  text-indent: 0;
+  white-space: nowrap;
+  font-style: normal;
+  text-decoration: none;
+}
+.doc p[data-cont]::before { content: none !important; display: none; }
+.doc p[data-cont] { text-indent: 0 !important; }
+.doc p[data-list][data-cont] { margin-left: calc(.5in + var(--lvl, 0) * .5in); }
+.doc p[data-split] { text-align-last: var(--tal, auto); }
+
+/* Inhaltsverzeichnis */
+.doc p[data-toc] { display: flex; align-items: baseline; gap: 4px; }
+.doc p[data-toc] .toctext { flex: 0 1 auto; }
+.doc p[data-toc] .tocdots { flex: 1 1 auto; border-bottom: 1px dotted #000; min-width: 12px; transform: translateY(-3px); }
+.doc p[data-toc] .tocnum { flex: 0 0 auto; }
+.doc p.s-tochead[data-toc] { display: block; }
+
+/* Umbrüche */
+.doc p.brk {
+  margin: 0; font-size: 8px; line-height: 8px; height: 8px; min-height: 0; --ls: 1;
+  color: #888; position: relative; text-indent: 0 !important;
+}
+.doc p.brk::before { content: none; }
+.doc.marks p.brk { height: 14px; font-size: 9px; line-height: 14px; text-align: center; border-top: 1px dashed #888; margin-top: 2px; }
+.doc.marks p.brk[data-brk="page"]::before { content: "Seitenumbruch"; display: inline; }
+.doc.marks p.brk[data-brk="column"]::before { content: "Spaltenumbruch"; display: inline; }
+.doc.marks p.brk[data-brk="sect"]::before { content: "Abschnittsumbruch (fortlaufend)"; display: inline; }
+.doc.marks p.brk[data-brk="sectnext"]::before { content: "Abschnittsumbruch (nächste Seite)"; display: inline; }
+.doc.marks p:not(.brk)::after { content: "\00B6"; color: #4a90d9; font-style: normal; font-weight: normal; text-decoration: none; margin-left: 1px; }
+
+/* ---- Tabellen ------------------------------------------------------------ */
+.doc table, .hfbox table, .tbtext table { border-collapse: collapse; table-layout: fixed; border-spacing: 0; margin: 0; }
+.doc table { margin-bottom: 8pt; }
+.doc td, .doc th, .hfbox td, .tbtext td { vertical-align: top; padding: 0 5.4pt; overflow-wrap: anywhere; word-break: normal; }
+.doc td > p, .doc th > p, .hfbox td > p, .tbtext td > p { margin: 0; --ls: 1; }
+.doc th { font-weight: bold; text-align: left; }
+.doc td.cell-sel { box-shadow: inset 0 0 0 9999px rgba(0, 120, 215, .28); }
+.doc table.t-noborder td, .doc table.t-noborder th { border: none; }
+
+/* ---- Bilder -------------------------------------------------------------- */
+.doc img, .hfbox img, .tbtext img { max-width: 100%; vertical-align: baseline; }
+.doc img.sel, .hfbox img.sel { outline: 2px solid #2b79d7; }
+
+/* ---- Felder (Seitenzahl, Datum) ----------------------------------------- */
+.fld { background: rgba(0, 0, 0, .06); border-radius: 2px; }
+.print .fld { background: none; }
+
+/* ---- Freie Objekte ------------------------------------------------------- */
+.fobj { position: absolute; pointer-events: auto; box-sizing: border-box; user-select: none; touch-action: none; }
+.fobj > svg.shp { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.fobj > svg.shp * { pointer-events: auto; }
+.fobj > img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; user-select: none; }
+.fobj > .tbtext {
+  position: absolute; left: 0; top: 0; right: 0; bottom: 0; box-sizing: border-box;
+  padding: 7.2pt; overflow: hidden; outline: none; user-select: text; cursor: default;
+}
+.fobj.editing > .tbtext { cursor: text; overflow: visible; }
+.fobj.editing { z-index: 50; }
+.fobj > .tbtext p { margin: 0 0 6pt 0; }
+
+/* ---- Druck --------------------------------------------------------------- */
+#printroot { display: none; }
+@media print {
+  @page { margin: 0; }
+  html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
+  #app, #backstage, #overlays { display: none !important; }
+  #printroot { display: block !important; }
+  .printpage { position: relative; overflow: hidden; break-after: page; page-break-after: always; background: #fff; }
+  .printpage:last-child { break-after: auto; page-break-after: auto; }
+  .printpage * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .printpage p.brk { visibility: hidden; }
+}
