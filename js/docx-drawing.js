@@ -132,7 +132,11 @@
     if (ln === 'pic') {
       const bf = kid(node, 'blipFill'), blip = kid(bf, 'blip');
       const rid = blip && A(blip, 'embed', NS.r);
-      const img = rid && (await loadImage(ctx, rid));
+      let img = rid && (await loadImage(ctx, rid));
+      if (!img && blip && A(blip, 'link', NS.r)) {
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="240" height="160" fill="#f3f3f3" stroke="#aaa" stroke-dasharray="6 4"/><text x="120" y="74" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#666">Verknüpftes Bild</text><text x="120" y="94" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#888">in der Datei nicht eingebettet</text></svg>';
+        img = { blob: new Blob([svg], { type: 'image/svg+xml' }), type: 'image/svg+xml', ext: 'svg', placeholder: true };
+      }
       if (!img) return;
       const spPr = kid(node, 'spPr'), xfrm = kid(spPr, 'xfrm');
       const geom = kid(spPr, 'prstGeom');

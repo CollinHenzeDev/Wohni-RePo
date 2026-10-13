@@ -941,6 +941,12 @@
       s.tblStylePr.forEach((sp) => { const t = A(sp, 'type'); if (t in stylePr) stylePr[t] = { rPr: parseRPr(ctx, kid(sp, 'rPr')), shd: wColor(ctx, kid(kid(sp, 'tcPr'), 'shd'), 'fill', 'themeFill'), bdr: readBorders(ctx, kid(kid(sp, 'tcPr'), 'tcBorders')) }; });
     });
     Object.assign(tbl, readBorders(ctx, kid(tblPr, 'tblBorders')));
+    // Standard-Zellabstände (Tabelle/Formatvorlage)
+    const cellMar = {};
+    const readMar = (el) => kids(el).forEach((m) => { const k = m.localName, v = u.tw2px(+A(m, 'w') || 0); if (k === 'left' || k === 'start') cellMar.left = v; else if (k === 'right' || k === 'end') cellMar.right = v; else if (k === 'top') cellMar.top = v; else if (k === 'bottom') cellMar.bottom = v; });
+    chain.forEach((s) => { if (s.tblPr) readMar(kid(s.tblPr, 'tblCellMar')); });
+    readMar(kid(tblPr, 'tblCellMar'));
+    const lay = A(kid(tblPr, 'tblLayout'), 'type');
     const look = kid(tblPr, 'tblLook');
     const lookVal = look ? parseInt(A(look, 'val') || '0', 16) : 0x04A0;
     const hasFirstRow = look && (A(look, 'firstRow') != null ? A(look, 'firstRow') === '1' : !!(lookVal & 0x20));
@@ -973,6 +979,7 @@
     }));
 
     const table = document.createElement('table');
+    if (lay !== 'fixed') table.style.tableLayout = 'auto';
     // Breite
     const tw = kid(tblPr, 'tblW');
     const contentW = u.tw2px(0) || W.geom().cw;
@@ -1025,6 +1032,10 @@
         if (!fill && tcBase.shd) fill = tcBase.shd;
         if (fill) td.style.backgroundColor = fill;
         const va = A(kid(pr, 'vAlign'), 'val'); if (va === 'center') td.style.verticalAlign = 'middle'; else if (va === 'bottom') td.style.verticalAlign = 'bottom';
+        if (cellMar.left != null && Math.abs(cellMar.left - 7.2) > 0.5) td.style.paddingLeft = cellMar.left.toFixed(1) + 'px';
+        if (cellMar.right != null && Math.abs(cellMar.right - 7.2) > 0.5) td.style.paddingRight = cellMar.right.toFixed(1) + 'px';
+        if (cellMar.top) td.style.paddingTop = cellMar.top.toFixed(1) + 'px';
+        if (cellMar.bottom) td.style.paddingBottom = cellMar.bottom.toFixed(1) + 'px';
         const mar = kid(pr, 'tcMar');
         if (mar) { kids(mar).forEach((m) => { const px = u.tw2px(+A(m, 'w') || 0).toFixed(1) + 'px'; const k = m.localName; if (k === 'left' || k === 'start') td.style.paddingLeft = px; else if (k === 'right' || k === 'end') td.style.paddingRight = px; else if (k === 'top') td.style.paddingTop = px; else if (k === 'bottom') td.style.paddingBottom = px; }); }
         // Inhalt

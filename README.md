@@ -53,8 +53,8 @@ Alternativ mit einem lokalen Server: `python3 -m http.server 8080` und dann <htt
 | Absatz | Ausrichtung, Blocksatz, Einzüge, Zeilen-/Absatzabstand, Rahmen, Schattierung, Tabulatoren, Aufzählungen und Nummerierungen (mehrstufig) |
 | Formatvorlagen | Standard, Überschrift 1–3, Titel, Untertitel, Zitat, Beschriftung u. a., Navigationsbereich, Inhaltsverzeichnis |
 | Einfügen | Tabellen (verbinden/teilen, Rahmen, Schattierung, Spaltenbreite per Maus), Bilder, Formen, Textfelder, Links, Symbole, Datum, Linie, Seiten-/Spalten-/Abschnittsumbruch |
-| Seite | Papierformate, Hoch-/Querformat, Ränder, Spalten, Kopf-/Fußzeile (erste Seite anders), Seitenzahlen, Wasserzeichen, Seitenrand, Seitenfarbe |
-| Prüfen | Rechtschreibprüfung des Browsers, Suchen & Ersetzen, Wörter zählen |
+| Seite | Papierformate, Hoch-/Querformat, Ränder, Spalten, Kopf-/Fußzeile (erste Seite anders), Seitenzahlen, Wasserzeichen, Seitenrand, Seitenfarbe, **Deckblätter**, Silbentrennung, „Seitenumbruch davor“ |
+| Prüfen | Rechtschreibprüfung des Browsers, Suchen & Ersetzen, Wörter zählen, **AutoKorrektur** (deutsche Anführungszeichen „…“, `--` → –, `...` → …, (c) → ©, automatische Listen) |
 | Ansicht | Drucklayout/Weblayout, Lineal (Ränder, Einzüge, Tabulatoren), Zoom, Navigationsbereich, Formatierungszeichen, dunkler Modus |
 | Dateien | `.docx` öffnen/speichern/einfügen, `.txt`, `.html`, Drag & Drop, Drucken/PDF, automatische Zwischenspeicherung |
 
@@ -86,11 +86,14 @@ docs/adr/           Architekturentscheidungen;  CONTEXT.md: Begriffe
 ## Tests
 
 Die Tests steuern einen echten Chromium-Browser per Playwright und prüfen Tippen, Formatieren, Tabellen, Spalten,
-Objekte hinter dem Text, Dialoge, Drucken, Speichern/Öffnen sowie den DOCX-Roundtrip:
+Objekte hinter dem Text, Dialoge, Drucken, Speichern/Öffnen sowie den DOCX-Roundtrip. Ein **Zufallstest** (`layout-fuzz`)
+erzeugt hunderte Dokumente mit Spalten, Tabellen, großen Bildern, Umbrüchen und Objekten und prüft, dass sich nichts
+überlappt, kein Text verloren geht und alles auf der Seite bleibt:
 
 ```
 node tests/run-all.js            # alle Tests
 node tests/features.js           # einzelne Tests
+SEED=7 N=300 node tests/layout-fuzz.js   # Zufallstest mit eigenem Startwert
 ```
 
 Voraussetzung: Node.js ≥ 18 und `playwright` (`npm i -g playwright`, Chromium vorhanden bzw. `npx playwright install chromium`).

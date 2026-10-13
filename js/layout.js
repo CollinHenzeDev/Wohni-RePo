@@ -113,6 +113,7 @@
       table: b.tagName === 'TABLE',
       brk: b.classList.contains('brk') ? b.getAttribute('data-brk') : null,
       pbb: b.hasAttribute('data-pbb'),
+      list: b.hasAttribute('data-list'),
       keep: /^H[1-6]$/.test(b.tagName) || b.hasAttribute('data-keep'),
       ctxKey: b.hasAttribute('data-ctx') ? b.tagName + '|' + b.className : null,
       fs: num(cs.fontSize),
@@ -122,8 +123,14 @@
     return inf;
   }
 
+  /** Wirksamer linker Einzug: in einer Spalte, die schmaler als Einzug + Mindestbreite ist, wird der Einzug gekürzt */
+  function effMl(inf, w) {
+    const room = w - inf.mr - 40;
+    return inf.ml > room ? Math.min(inf.ml, Math.max(inf.list ? 24 : 0, room)) : inf.ml;
+  }
+  const lwOf = (inf, w) => Math.max(20, w - effMl(inf, w) - inf.mr).toFixed(2);   // der als --lw gesetzte Wert
   function setW(inf, w) {
-    inf.el.style.setProperty('--lw', Math.max(20, w - inf.ml - inf.mr).toFixed(2) + 'px');
+    inf.el.style.setProperty('--lw', lwOf(inf, w) + 'px');
     inf.w = w;
   }
   const hOf = (inf) => inf.el.getBoundingClientRect().height;
@@ -396,24 +403,26 @@
     // --- Spaltenkonfiguration ---
     let cfg = Object.assign({}, doc.cols);
     const widthsOf = (c) => W.colGeom(c, G.cw).map((x) => x.w);
-    const distinct = (arr) => Array.from(new Set(arr.map((v) => Math.round(v * 10) / 10)));
+    // Doppelte Breiten entfernen, aber die echten (ungerundeten) Werte behalten – sonst wird bei einer
+    // gerundeten Breite gemessen und der Umbruch weicht von der endgültigen Darstellung ab
+    const distinct = (arr) => { const seen = new Set(); return arr.filter((v) => { const k = Math.round(v * 100); if (seen.has(k)) return false; seen.add(k); return true; }); };
 
     // Alle Blöcke einmal in der ersten Spaltenbreite messen
     const heights = new Map();     // el -> Map(wKey -> h)
     const hcache = (el) => { let m = heights.get(el); if (!m) { m = new Map(); heights.set(el, m); } return m; };
-    const wkey = (w) => Math.round(w * 10) / 10;
+    const wkey = lwOf;
     function measureAll(w) {
       for (const b of blocks) setW(infos.get(b), w);
       const vals = blocks.map((b) => hOf(infos.get(b)));
-      blocks.forEach((b, i) => hcache(b).set(wkey(w), vals[i]));
+      blocks.forEach((b, i) => hcache(b).set(wkey(infos.get(b), w), vals[i]));
     }
     const measured = new Set();
     function ensureMeasured(w) {
-      const k = wkey(w);
+      const k = Math.round(w * 100);
       if (!measured.has(k)) { measureAll(w); measured.add(k); }
     }
     function heightAt(inf, w) {
-      const k = wkey(w);
+      const k = wkey(inf, w);
       const m = hcache(inf.el);
       if (m.has(k)) return m.get(k);
       setW(inf, w);
@@ -569,7 +578,8 @@
 
         // Nichts passt: bei leerem, vollem Segment erzwingen, sonst weiter
         if (seg.empty && seg.full) { place(inf, h, gap); break; }
-        if (++guardCount > 4) { place(inf, h, gap); break; }
+        // Übergroße Blöcke (höher als jedes Segment) wandern bis zu einem leeren, ungeteilten Segment – nur zur Sicherheit begrenzt
+        if (++guardCount > 400) { place(inf, h, gap); break; }
         nextSeg();
       }
     }
@@ -586,7 +596,7 @@
       const el = p.inf.el;
       el.style.setProperty('--lx', '0px');
       el.style.setProperty('--ly', '0px');
-      if (!p.control) el.style.setProperty('--lw', Math.max(20, p.w - p.inf.ml - p.inf.mr).toFixed(2) + 'px');
+      if (!p.control) el.style.setProperty('--lw', lwOf(p.inf, p.w) + 'px');
       else el.style.removeProperty('--lw');
     });
     // 2. Nominale Positionen lesen (ein einziges Layout)
@@ -597,7 +607,7 @@
     let webBottom = G.mt;
     placements.forEach((p, i) => {
       const el = p.inf.el;
-      el.style.setProperty('--lx', (p.x - G.ml).toFixed(2) + 'px');
+      el.style.setProperty('--lx', (p.x - G.ml - (p.control ? 0 : p.inf.ml - effMl(p.inf, p.w))).toFixed(2) + 'px');
       el.style.setProperty('--ly', (p.page * stride + p.y - tops[i]).toFixed(2) + 'px');
       L.pageMap.set(el, p.page);
       // Text ohne eigene Farbe wird auf dunklem Spaltenhintergrund automatisch hell dargestellt
@@ -611,7 +621,7 @@
     updateTabs();
     L.blockH = new WeakMap();
     L.blockCount = flow.children.length;
-    placements.forEach((p) => { if (!p.control) L.blockH.set(p.inf.el, hcache(p.inf.el).get(wkey(p.w))); });
+    placements.forEach((p) => { if (!p.control) L.blockH.set(p.inf.el, hcache(p.inf.el).get(wkey(p.inf, p.w))); });
     const pageH = web ? Math.max(G.ph, webBottom + G.mb) : G.ph;
     L.info = { pageCount, G, web, pageH, placements: placements.length };
     L.G = G; L.pageH = pageH;
