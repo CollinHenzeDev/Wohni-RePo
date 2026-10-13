@@ -132,6 +132,9 @@
 .doc p[data-list][data-cont] { margin-left: calc(.5in + var(--lvl, 0) * .5in); }
 .doc p[data-split] { text-align-last: var(--tal, auto); }
 
+/* Heller Text auf dunklen Spalten (nur wenn keine eigene Farbe gesetzt ist) */
+.doc [data-ink="light"] { color: #ffffff; caret-color: #ffffff; }
+
 /* Tabulatoren */
 .doc .tabc { display: inline-block; white-space: pre; vertical-align: baseline; height: 0.9em; }
 .doc .tabc[data-lead="dot"] { background: radial-gradient(circle at 1px 82%, currentColor 0.55px, transparent 0.7px) repeat-x; background-size: 4px 100%; }

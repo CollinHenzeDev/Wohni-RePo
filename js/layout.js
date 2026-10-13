@@ -298,6 +298,29 @@
     timer = setTimeout(() => { timer = 0; L.run(); }, 16);
   };
 
+  /**
+   * Schnellprüfung nach einfachem Tippen: Hat sich die Höhe des bearbeiteten Blocks nicht geändert,
+   * bleibt jeder andere Block an seinem Platz – ein voller Layoutlauf ist dann unnötig.
+   */
+  L.canSkip = function () {
+    const flow = W.el.flow;
+    if (!L.blockH || timer || flow.children.length !== L.blockCount) return false;
+    const sel = getSelection();
+    if (!sel.rangeCount || !sel.isCollapsed) return false;
+    let n = sel.anchorNode;
+    n = n && (n.nodeType === 1 ? n : n.parentNode);
+    if (!n || !flow.contains(n)) return false;
+    let top = n; while (top && top.parentNode !== flow) top = top.parentNode;
+    if (!top || !top.hasAttribute('data-lay') || top.hasAttribute('data-cont') || top.tagName === 'TABLE' && false) return false;
+    if (top.nextElementSibling && top.nextElementSibling.hasAttribute('data-cont')) { /* Kopfteil: Höhe prüfen wie sonst */ }
+    if (top.querySelector('.tabc,.fld') || top.hasAttribute('data-toc') || top.matches('p.brk')) return false;
+    const old = L.blockH.get(top);
+    if (old == null) return false;
+    const z = (W.view && W.view.zoom) || 1;
+    const h = top.getBoundingClientRect().height / z;
+    return Math.abs(h - old) < 0.6;
+  };
+
   /** Struktur-Bearbeitung vorbereiten: weiche Teilungen auflösen, Auswahl sichern */
   L.beginEdit = function () {
     const flow = W.el.flow;
@@ -440,7 +463,7 @@
     function place(inf, h, gapAbove) {
       const seg = cur;
       const top = seg.cursor + gapAbove;
-      placements.push({ inf, page: seg.page, x: seg.x, y: seg.y + top, w: seg.w });
+      placements.push({ inf, page: seg.page, x: seg.x, y: seg.y + top, w: seg.w, bg: cfg.bg && cfg.bg[seg.col] });
       seg.cursor = top + h;
       seg.prevMb = inf.mb;
       seg.prevKey = inf.ctxKey;
@@ -573,6 +596,8 @@
       el.style.setProperty('--lx', (p.x - G.ml).toFixed(2) + 'px');
       el.style.setProperty('--ly', (p.page * stride + p.y - tops[i]).toFixed(2) + 'px');
       L.pageMap.set(el, p.page);
+      // Text ohne eigene Farbe wird auf dunklem Spaltenhintergrund automatisch hell dargestellt
+      if (!p.control && p.bg && W.color.isDark(p.bg)) el.setAttribute('data-ink', 'light'); else el.removeAttribute('data-ink');
       if (web) webBottom = Math.max(webBottom, p.y + hts[i]);
     });
 
@@ -580,6 +605,9 @@
     if (!web) doc.floats.forEach((f) => { if (f.page > pageCount - 1) f.page = pageCount - 1; });
 
     updateTabs();
+    L.blockH = new WeakMap();
+    L.blockCount = flow.children.length;
+    placements.forEach((p) => { if (!p.control) L.blockH.set(p.inf.el, hcache(p.inf.el).get(wkey(p.w))); });
     const pageH = web ? Math.max(G.ph, webBottom + G.mb) : G.ph;
     L.info = { pageCount, G, web, pageH, placements: placements.length };
     L.G = G; L.pageH = pageH;
@@ -701,7 +729,7 @@
   /* ------------------------------------------------------------------ */
   /*  Serialisierung (ohne Layout-Zustand)                                */
   /* ------------------------------------------------------------------ */
-  L.cleanClone = function (flow) {
+  L.cleanClone = function (flow, opts) {
     const clone = (flow || W.el.flow).cloneNode(true);
     unsplit(clone);
     clone.removeAttribute('style');
@@ -710,6 +738,7 @@
       LAYOUT_VARS.forEach((v) => e.style.removeProperty(v));
       if (!e.getAttribute('style')) e.removeAttribute('style');
     });
+    if (!(opts && opts.keepInk)) clone.querySelectorAll('[data-ink]').forEach((e) => e.removeAttribute('data-ink'));
     clone.querySelectorAll('[data-split]').forEach((e) => { e.removeAttribute('data-split'); e.style.removeProperty('--tal'); if (!e.getAttribute('style')) e.removeAttribute('style'); });
     clone.querySelectorAll('.cell-sel').forEach((e) => e.classList.remove('cell-sel'));
     clone.querySelectorAll('.sel').forEach((e) => { e.classList.remove('sel'); if (!e.getAttribute('class')) e.removeAttribute('class'); });

@@ -29,6 +29,7 @@ Alternativ mit einem lokalen Server: `python3 -m http.server 8080` und dann <htt
 * **Layout → Spalten → Weitere Spalten …**: Spaltenbreiten in cm, Abstand, Trennlinie und eine **Hintergrundfarbe pro Spalte**
   (die farbige Seitenleiste reicht auf Wunsch bis zum Seitenrand). Mit „Auf Folgeseiten nur die breiteste Spalte verwenden“
   läuft ein langer Lebenslauf auf Seite 2 nur in der Hauptspalte weiter.
+* Text ohne eigene Farbe wird auf **dunklem Spaltenhintergrund automatisch hell** dargestellt (und so auch exportiert).
 * **Datei → Neu** enthält fertige Vorlagen: *Lebenslauf – schmale linke Spalte*, *Lebenslauf – schmale rechte Spalte*,
   Brief, Bericht und Newsletter.
 * Die Spalten werden in der `.docx` als echte Word-Spalten (`w:cols`, auch ungleich breit) gespeichert; die farbigen

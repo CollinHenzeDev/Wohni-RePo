@@ -244,13 +244,17 @@
     { icon: 'colsLeft', label: 'Links  (schmale linke Spalte)', fn: () => W.cmd.columns('left') }, { icon: 'colsRight', label: 'Rechts  (schmale rechte Spalte)', fn: () => W.cmd.columns('right') },
     { sep: true }, { icon: 'columnbreak', label: 'Spaltenumbruch einfügen', hint: M + '⇧Eingabe', fn: () => W.cmd.columnBreak() }, { label: 'Weitere Spalten…', fn: () => W.dialogs.columns() },
   ];
-  const wrapMenu = () => [
-    { icon: 'wrapInline', label: 'Mit Text in Zeile', fn: () => W.cmd.wrap('inline') },
-    { icon: 'wrapSquare', label: 'Quadrat', fn: () => W.cmd.wrap('square') },
-    { icon: 'wrapTopBottom', label: 'Oben und unten', fn: () => W.cmd.wrap('topbottom') },
-    { icon: 'wrapBehind', label: 'Hinter den Text', fn: () => W.cmd.wrap('behind') },
-    { icon: 'wrapFront', label: 'Vor den Text', fn: () => W.cmd.wrap('front') },
-  ];
+  const wrapMenu = () => {
+    const sel = W.floats.selected;
+    const cur = sel ? (sel.inline ? 'inline' : sel.float && sel.float.wrap) : null;
+    return [
+      { icon: 'wrapInline', label: 'Mit Text in Zeile', checked: cur === 'inline', fn: () => W.cmd.wrap('inline') },
+      { icon: 'wrapSquare', label: 'Quadrat', checked: cur === 'square', fn: () => W.cmd.wrap('square') },
+      { icon: 'wrapTopBottom', label: 'Oben und unten', checked: cur === 'topbottom', fn: () => W.cmd.wrap('topbottom') },
+      { icon: 'wrapBehind', label: 'Hinter den Text', checked: cur === 'behind', fn: () => W.cmd.wrap('behind') },
+      { icon: 'wrapFront', label: 'Vor den Text', checked: cur === 'front', fn: () => W.cmd.wrap('front') },
+    ];
+  };
   const objAlignMenu = () => [
     { label: 'Links an Seite', fn: () => W.floats.align('left') }, { label: 'Horizontal zentrieren', fn: () => W.floats.align('center') }, { label: 'Rechts an Seite', fn: () => W.floats.align('right') },
     { sep: true }, { label: 'Oben an Seite', fn: () => W.floats.align('top') }, { label: 'Vertikal zentrieren', fn: () => W.floats.align('middle') }, { label: 'Unten an Seite', fn: () => W.floats.align('bottom') },

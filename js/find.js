@@ -156,5 +156,6 @@
     q.focus(); q.select();
     S.search();
   };
+  W.on('typed', () => { if (S.panel) { S.matches = collect(S.q.value); if (S.cur >= S.matches.length) S.cur = S.matches.length - 1; paint(); count(); } });
   W.on('layout', () => { if (S.panel && !W.composing) { const keep = S.cur; S.matches = collect(S.q.value); if (S.cur >= S.matches.length) S.cur = S.matches.length - 1; paint(); count(); } });
 })();

@@ -85,7 +85,7 @@
     st.rel = (type, target, ext) => { const id = 'rId' + (++st.relN); st.rels.push({ id, type, target, ext }); return id; };
 
     try {
-      const clone = W.layout.cleanClone();
+      const clone = W.layout.cleanClone(null, { keepInk: true });
       sb.appendChild(clone);
       clone.removeAttribute('contenteditable'); clone.removeAttribute('id');
       clone.style.cssText = 'position:static;width:auto';

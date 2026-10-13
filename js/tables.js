@@ -149,6 +149,7 @@
     const table = cells[0].closest('table');
     W.edit(() => {
       const gr = T.grid(table);
+      const w = colWidths(table);          // vor dem Einfügen berechnen (altes Gitter)
       const cols = cells.map((c) => gr.g[c.parentElement.rowIndex].findIndex((x) => x && x.cell === c));
       const cidx = right ? Math.max(...cols) : Math.min(...cols);
       const spanEnd = right ? cidx + (gr.g[cells[0].parentElement.rowIndex][cidx].cs - (cidx - gr.g[cells[0].parentElement.rowIndex][cidx].c0)) : cidx;
@@ -165,7 +166,6 @@
         else tr.appendChild(nc);
       });
       // Spaltenbreiten
-      const w = colWidths(table);
       const ref = Math.min(Math.max(right ? insertAt - 1 : insertAt, 0), w.length - 1);
       const half = (w[ref] || 20) / 2;
       w[ref] = half; w.splice(insertAt, 0, half);
@@ -350,13 +350,15 @@
       const gr = T.grid(table);
       const inSel = new Set(cells);
       const side = { top: 'border-top', bottom: 'border-bottom', left: 'border-left', right: 'border-right' };
-      const apply = (cell, s, v) => { cell.style.removeProperty('border'); cell.style.setProperty(side[s], v); };
+      const apply = (cell, s, v) => { cell.style.setProperty(side[s], v); };
       // Gesamtrahmen in Einzelseiten aufbrechen
       table.querySelectorAll('td,th').forEach((c) => {
-        const b = c.style.border;
-        if (b) {
-          c.style.removeProperty('border');
-          ['top', 'bottom', 'left', 'right'].forEach((s) => { if (!c.style.getPropertyValue(side[s])) c.style.setProperty(side[s], b); });
+        const cs = c.style;
+        // Kurzschreibweise "border" (auch als border-width/-style/-color serialisiert) in vier Seiten zerlegen
+        const whole = cs.border || (cs.borderStyle && !/ /.test(cs.borderStyle) && cs.borderStyle ? [cs.borderWidth, cs.borderStyle, cs.borderColor].join(' ') : '');
+        if (whole) {
+          ['border', 'border-width', 'border-style', 'border-color'].forEach((p) => cs.removeProperty(p));
+          ['top', 'bottom', 'left', 'right'].forEach((s) => { if (!cs.getPropertyValue(side[s])) cs.setProperty(side[s], whole); });
         }
       });
       const v = kind === 'none' ? 'none' : value;

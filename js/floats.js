@@ -360,12 +360,12 @@
     }
     return false;
   }
-  function floatAt(x, y, layer) {
+  function floatAt(x, y, layer, force) {
     const els = document.elementsFromPoint(x, y);
     for (const e of els) {
       const fo = e.closest && e.closest('.fobj');
       if (fo && (!layer || fo.parentNode === layer)) {
-        if (fo.parentNode === W.el.behind && onText(x, y)) return null;
+        if (fo.parentNode === W.el.behind && !force && onText(x, y)) return null;
         // Linien: nur auf dem Strich treffen (SVG-Pfad) – Hintergrund ignorieren
         return Fl.byId(fo.dataset.id) || null;
       }
@@ -416,7 +416,7 @@
       return;
     }
     // Rahmen eines bereits gewählten Objekts: im Inneren nur ziehen, wenn nicht auf Text
-    const f = floatAt(ev.clientX, ev.clientY, null);
+    const f = floatAt(ev.clientX, ev.clientY, null, ev.altKey);
     if (f) {
       ev.preventDefault();
       Fl.stopEdit();

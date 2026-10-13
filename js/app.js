@@ -118,7 +118,8 @@
     flow.addEventListener('input', (e) => {
       if (W.composing) return;
       fixAfterEnter(e);
-      W.layout.schedule(flow.children.length < 250);
+      const simple = e.inputType === 'insertText' || e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward';
+      if (!(simple && W.layout.canSkip())) W.layout.schedule(flow.children.length < 250); else W.emit('typed');
       const k = kindOf(e.inputType || '');
       if (k === 'struct' || k === 'other') W.history.push(); else W.history.schedule();
       W.markDirty();
@@ -296,6 +297,7 @@
   /* ------------------------------------------------------------------ */
   function init() {
     W.initEls();
+    try { if (localStorage.getItem('wohni.dark') === '1') document.body.classList.add('dark'); } catch (e) { /* */ }
     try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { /* */ }
     try { document.execCommand('styleWithCSS', false, true); } catch (e) { /* */ }
     W.el.app.tabIndex = -1;
@@ -312,6 +314,12 @@
       if (ws.clientWidth < W.geom().pw + 60) V.fitWidth(); else V.setZoom(1, false);
       W.el.flow.focus({ preventScroll: true });
       W.emit('ready');
+      try {
+        if (!localStorage.getItem('wohni.welcome') && !restored) {
+          localStorage.setItem('wohni.welcome', '1');
+          W.toast('Willkommen! Word-Dateien (.docx) kannst du hierher ziehen oder über Datei → Öffnen laden. Vorlagen, z. B. für Lebensläufe, findest du unter Datei → Neu.', 9000);
+        }
+      } catch (e) { /* */ }
     };
     start();
   }
