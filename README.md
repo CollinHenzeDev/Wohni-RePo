@@ -45,6 +45,25 @@ Alternativ mit einem lokalen Server: `python3 -m http.server 8080` und dann <htt
   Füllung/Kontur/Schatten und Reihenfolge in der Registerkarte *Formformat*; der **Auswahlbereich** listet alle Objekte.
 * Objekte hinter dem Text beeinflussen den Textfluss nicht – der Text wird weder verschoben noch umbrochen.
 
+## Tabellen bearbeiten
+
+Sobald der Cursor in einer Tabelle steht, erscheinen **Griffe** und die Registerkarte **Tabellenlayout**.
+
+* **Zeilen und Spalten verschieben:** Den grauen Griff links neben einer Zeile bzw. über einer Spalte anklicken (markiert sie)
+  und mit der Maus an die neue Stelle ziehen – eine blaue Linie zeigt, wohin sie kommt. Alternativ **Tabellenlayout → Verschieben**
+  oder **Alt + Umschalt + ↑ ↓** (Zeile) bzw. **← →** (Spalte). Mit Umschalt lassen sich mehrere Zeilen/Spalten markieren.
+  Verbundene Zellen, die im Weg wären, verhindern das Verschieben (die Tabelle bleibt dann unverändert).
+* **Entfernen:** die markierte Zeile/Spalte über die kleine Leiste neben dem Griff löschen (Rechtsklick auf den Griff zeigt
+  dasselbe Menü), **Entf** leert nur den Inhalt, der Eckgriff oben links markiert die ganze Tabelle.
+* **Breite und Länge (Höhe):** Eckgriff unten rechts ziehen (Breite und Höhe zugleich), den rechten Tabellenrand ziehen
+  (Breite), die Unterkante einer Zeile ziehen (Zeilenhöhe) oder Werte eingeben: *Tabellenlayout → Zellengröße* (Tabellenbreite,
+  Tabellenhöhe, Zeilenhöhe, Spaltenbreite in cm) bzw. *Eigenschaften …* mit Innenabstand und Ausrichtung.
+* **Rahmen:** *Tabellenlayout → Rahmen*: Linienart (durchgezogen, gestrichelt, gepunktet, doppelt), Linienstärke (¼ bis 6 pt) und
+  Stiftfarbe wählen und mit *Rahmen* anwenden (alle, außen, innen, einzelne Seiten, keine). Der Dialog *Tabelleneigenschaften*
+  fasst alles zusammen. Die Seitenränder des Dokuments (Layout → Seitenränder) sind davon unabhängig.
+* Alles wird in der `.docx` gespeichert (Spaltenbreiten, Zeilenhöhen, Linienart/-stärke/-farbe) und auch beim Öffnen von
+  Word-Dateien übernommen.
+
 ## Funktionen
 
 | Bereich | Umfang |
@@ -52,7 +71,7 @@ Alternativ mit einem lokalen Server: `python3 -m http.server 8080` und dann <htt
 | Text | Schriftart, -größe, Fett/Kursiv/Unterstrichen/Durchgestrichen, Hoch-/Tiefgestellt, Farben, Hervorhebung, Groß-/Kleinschreibung, Format übertragen |
 | Absatz | Ausrichtung, Blocksatz, Einzüge, Zeilen-/Absatzabstand, Rahmen, Schattierung, Tabulatoren, Aufzählungen und Nummerierungen (mehrstufig) |
 | Formatvorlagen | Standard, Überschrift 1–3, Titel, Untertitel, Zitat, Beschriftung u. a., Navigationsbereich, Inhaltsverzeichnis |
-| Einfügen | Tabellen (verbinden/teilen, Rahmen, Schattierung, Spaltenbreite per Maus), Bilder, Formen, Textfelder, Links, Symbole, Datum, Linie, Seiten-/Spalten-/Abschnittsumbruch |
+| Einfügen | Tabellen (verbinden/teilen, Zeilen/Spalten verschieben, Größe per Maus, Rahmen mit Linienart/-stärke/-farbe, Schattierung), Bilder, Formen, Textfelder, Links, Symbole, Datum, Linie, Seiten-/Spalten-/Abschnittsumbruch |
 | Seite | Papierformate, Hoch-/Querformat, Ränder, Spalten, Kopf-/Fußzeile (erste Seite anders), Seitenzahlen, Wasserzeichen, Seitenrand, Seitenfarbe, **Deckblätter**, Silbentrennung, „Seitenumbruch davor“ |
 | Prüfen | Rechtschreibprüfung des Browsers, Suchen & Ersetzen, Wörter zählen, **AutoKorrektur** (deutsche Anführungszeichen „…“, `--` → –, `...` → …, (c) → ©, automatische Listen) |
 | Ansicht | Drucklayout/Weblayout, Lineal (Ränder, Einzüge, Tabulatoren), Zoom, Navigationsbereich, Formatierungszeichen, dunkler Modus |

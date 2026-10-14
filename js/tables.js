@@ -24,6 +24,20 @@
     return { g, nr: rows.length, nc, rows };
   };
 
+  /** Weich geteilte Tabellen bestehen aus mehreren <table>-Teilstücken: Kopfteil + data-cont-Fortsetzungen */
+  T.headOf = (table) => {
+    let t = table;
+    while (t && t.hasAttribute('data-cont') && t.previousElementSibling && t.previousElementSibling.tagName === 'TABLE') t = t.previousElementSibling;
+    return t;
+  };
+  T.pieces = (table) => {
+    const head = T.headOf(table);
+    const out = [head];
+    let n = head.nextElementSibling;
+    while (n && n.tagName === 'TABLE' && n.hasAttribute('data-cont')) { out.push(n); n = n.nextElementSibling; }
+    return out;
+  };
+  T.allRows = (table) => T.pieces(table).flatMap((t) => Array.from(t.rows));
   T.tableOf = (node) => {
     const el = node && (node.nodeType === 1 ? node : node.parentElement);
     return el ? el.closest('table') : null;
@@ -34,7 +48,16 @@
   };
 
   /** Ausgewählte Zellen (Auswahl über mehrere Zellen oder aktuelle Zelle) */
+  T.rect = null;      // rechteckige Auswahl über die Griffe: { kind: 'row'|'col'|'table', cells, anchor }
+  function rectValid() {
+    const R = T.rect; if (!R) return false;
+    if (!R.cells.every((c) => c.isConnected)) { T.rect = null; return false; }
+    const r = W.sel.range(W.el.flow);
+    if (!r || T.cellOf(r.startContainer) !== R.anchor) { T.rect = null; return false; }
+    return true;
+  }
   T.selectedCells = function () {
+    if (rectValid()) return T.rect.cells.slice();
     const r = W.sel.range(W.el.flow);
     if (!r) return [];
     const startCell = T.cellOf(r.startContainer), endCell = T.cellOf(r.endContainer);
@@ -46,7 +69,8 @@
   };
   T.currentTable = function () {
     const r = W.sel.range(W.el.flow);
-    return r ? T.tableOf(r.startContainer) : null;
+    const t = r ? T.tableOf(r.startContainer) : null;
+    return t && t.parentNode === W.el.flow ? T.headOf(t) : t;
   };
 
   function newCell(tag, like) {
@@ -74,6 +98,16 @@
   }
 
   const BORDER_DEFAULT = '1px solid #000000';
+
+  /** Aktueller „Stift“ für Rahmenlinien (Breite in px) */
+  T.pen = { style: 'solid', width: 1, color: '#000000' };
+  T.PEN_STYLES = [['solid', 'Durchgezogen'], ['dashed', 'Gestrichelt'], ['dotted', 'Gepunktet'], ['double', 'Doppelt']];
+  T.PEN_WIDTHS = [0.25, 0.5, 0.75, 1, 1.5, 2.25, 3, 4.5, 6];       // in pt
+  const pt2px = (pt) => pt * 96 / 72;
+  T.setPen = function (o) {
+    Object.assign(T.pen, o);
+    W.emit('pen', T.pen);
+  };
 
   /* ---------- Einfügen ---------- */
   T.create = function (rows, cols, opts) {
@@ -113,8 +147,8 @@
   /* ---------- Zeilen / Spalten ---------- */
   T.addRow = function (below) {
     const cells = T.selectedCells(); if (!cells.length) return;
-    const table = cells[0].closest('table');
     W.edit(() => {
+      const table = cells[0].closest('table');
       const gr = T.grid(table);
       const rowsSel = cells.map((c) => c.parentElement.rowIndex);
       const ref = below ? Math.max(...rowsSel) + (cells[cells.length - 1].rowSpan - 1) : Math.min(...rowsSel);
@@ -146,8 +180,8 @@
 
   T.addColumn = function (right) {
     const cells = T.selectedCells(); if (!cells.length) return;
-    const table = cells[0].closest('table');
     W.edit(() => {
+      const table = cells[0].closest('table');
       const gr = T.grid(table);
       const w = colWidths(table);          // vor dem Einfügen berechnen (altes Gitter)
       const cols = cells.map((c) => gr.g[c.parentElement.rowIndex].findIndex((x) => x && x.cell === c));
@@ -175,8 +209,8 @@
 
   T.deleteRow = function () {
     const cells = T.selectedCells(); if (!cells.length) return;
-    const table = cells[0].closest('table');
     W.edit(() => {
+      const table = cells[0].closest('table');
       const gr = T.grid(table);
       const rs = Array.from(new Set(cells.map((c) => c.parentElement.rowIndex))).sort((a, b) => b - a);
       if (rs.length >= gr.nr) { table.remove(); return; }
@@ -210,8 +244,8 @@
 
   T.deleteColumn = function () {
     const cells = T.selectedCells(); if (!cells.length) return;
-    const table = cells[0].closest('table');
     W.edit(() => {
+      const table = cells[0].closest('table');
       const gr = T.grid(table);
       const cset = new Set();
       cells.forEach((c) => { const r = c.parentElement.rowIndex; gr.g[r].forEach((x, i) => { if (x && x.cell === c) cset.add(i); }); });
@@ -246,8 +280,8 @@
   T.mergeCells = function () {
     const cells = T.selectedCells();
     if (cells.length < 2) return;
-    const table = cells[0].closest('table');
     W.edit(() => {
+      const table = cells[0].closest('table');
       const gr = T.grid(table);
       let r0 = 1e9, c0 = 1e9, r1 = -1, c1 = -1;
       cells.forEach((c) => {
@@ -282,8 +316,9 @@
   T.splitCell = function (nCols) {
     const cells = T.selectedCells();
     if (cells.length !== 1) return;
-    const cell = cells[0], table = cell.closest('table');
+    const cell = cells[0];
     W.edit(() => {
+      const table = cell.closest('table');
       const gr = T.grid(table);
       const pos = gr.g.flat().find((x) => x && x.cell === cell && x.origin);
       if (!pos) return false;
@@ -339,13 +374,13 @@
   };
 
   /** Rahmen für die Auswahl (oder die ganze Tabelle) */
-  T.setBorders = function (kind, color, width, style) {
+  T.setBorders = function (kind, color, width, style, cellsOverride) {
     const table = T.currentTable(); if (!table) return;
-    color = color || '#000000'; width = width || 1; style = style || 'solid';
-    const value = `${width}px ${style} ${color}`;
+    color = color || T.pen.color; width = width || T.pen.width; style = style || T.pen.style;
+    if (style === 'double') width = Math.max(width, 3);       // doppelte Linien brauchen mindestens 3 px
+    const value = `${+width.toFixed(2)}px ${style} ${color}`;
     W.edit(() => {
-      let cells = T.selectedCells();
-      const wholeTable = cells.length === 0 || (cells.length === 1 && ['all', 'none', 'outside', 'inside'].includes(kind) && false);
+      let cells = cellsOverride || T.selectedCells();
       if (!cells.length) cells = Array.from(table.querySelectorAll('td,th'));
       const gr = T.grid(table);
       const inSel = new Set(cells);
@@ -428,9 +463,30 @@
     const t = T.currentTable(); if (!t) return;
     W.edit(() => { t.style.setProperty('--tw', String(f)); });
   };
-  T.setRowHeight = function (px) {
-    const cells = T.selectedCells(); if (!cells.length) return;
+  T.setRowHeight = function (px, cellsOverride) {
+    const cells = cellsOverride || T.selectedCells(); if (!cells.length) return;
     W.edit(() => cells.forEach((c) => { c.parentElement.style.height = px ? px + 'px' : ''; }));
+  };
+  /** Innenabstand der Zellen (px); null = unverändert */
+  T.setCellPadding = function (pad, cellsOverride) {
+    let cells = cellsOverride || T.selectedCells();
+    if (!cells.length) { const t = T.currentTable(); cells = t ? T.pieces(t).flatMap((p) => Array.from(p.querySelectorAll('td,th'))) : []; }
+    if (!cells.length) return;
+    W.edit(() => cells.forEach((c) => {
+      for (const [k, prop] of [['top', 'padding-top'], ['right', 'padding-right'], ['bottom', 'padding-bottom'], ['left', 'padding-left']]) {
+        if (pad[k] != null) c.style.setProperty(prop, pad[k].toFixed(1) + 'px');
+      }
+    }));
+  };
+  /** Alle Zeilen gleich hoch machen (Mittel der aktuellen Höhen) */
+  T.distributeRows = function () {
+    const t = T.currentTable(); if (!t) return;
+    W.edit(() => {
+      const rows = T.allRows(t);
+      const hs = rows.map((tr) => tr.getBoundingClientRect().height / ((W.view && W.view.zoom) || 1));
+      const avg = hs.reduce((a, b) => a + b, 0) / (hs.length || 1);
+      rows.forEach((tr) => { tr.style.height = avg.toFixed(1) + 'px'; });
+    });
   };
   T.alignTable = function (a) {
     const t = T.currentTable(); if (!t) return;
@@ -441,13 +497,268 @@
     });
   };
 
-  /* ---------- Tastatur: Tab / Umschalt+Tab ---------- */
+  /* ------------------------------------------------------------------ */
+  /*  Rechteckige Auswahl (Zeile / Spalte / Tabelle) über die Griffe      */
+  /* ------------------------------------------------------------------ */
+  function placeCaret(cell) {
+    W.el.flow.focus({ preventScroll: true });
+    const p = cell.querySelector('p,h1,h2,h3,h4,h5,h6');
+    if (p) W.sel.caretIn(p, false);
+  }
+  function setRect(kind, table, range, cells) {
+    if (!cells.length) return;
+    T.rect = { kind, table, range, cells, anchor: cells[0] };
+    placeCaret(T.rect.anchor);
+    highlight();
+    W.emit('tablecontext', T.currentTable());
+    W.emit('tablerect', T.rect);
+  }
+  T.clearRect = function () { if (T.rect) { T.rect = null; highlight(); W.emit('tablerect', null); } };
+
+  function cellsOfRows(table, a, b) {
+    const out = new Set();
+    T.allRows(table).slice(a, b + 1).forEach((tr) => {
+      const gr = T.grid(tr.closest('table'));
+      (gr.g[tr.rowIndex] || []).forEach((x) => { if (x) out.add(x.cell); });
+    });
+    return Array.from(out);
+  }
+  function cellsOfCols(table, a, b) {
+    const out = new Set();
+    T.pieces(table).forEach((piece) => T.grid(piece).g.forEach((row) => { for (let c = a; c <= b; c++) if (row[c]) out.add(row[c].cell); }));
+    return Array.from(out);
+  }
+  /** Zeilen a..b (logische Indizes über alle Teilstücke) markieren */
+  T.selectRows = function (table, a, b) {
+    table = T.headOf(table);
+    const n = T.allRows(table).length;
+    a = W.clamp(a, 0, n - 1); b = W.clamp(b, a, n - 1);
+    setRect('row', table, [a, b], cellsOfRows(table, a, b));
+  };
+  T.selectColumns = function (table, a, b) {
+    table = T.headOf(table);
+    const nc = T.grid(table).nc;
+    a = W.clamp(a, 0, nc - 1); b = W.clamp(b, a, nc - 1);
+    setRect('col', table, [a, b], cellsOfCols(table, a, b));
+  };
+  T.selectTable = function (table) {
+    table = T.headOf(table);
+    const cells = T.pieces(table).flatMap((t) => Array.from(t.querySelectorAll('td,th')).filter((c) => c.closest('table') === t));
+    setRect('table', table, null, cells);
+  };
+  /** Zeilen-/Spaltenindex der Auswahl (für Menüs und Schaltflächen) */
+  T.logicalRowIndex = (tr) => T.allRows(T.headOf(tr.closest('table'))).indexOf(tr);
+
+  /* ------------------------------------------------------------------ */
+  /*  Zeilen und Spalten verschieben                                      */
+  /* ------------------------------------------------------------------ */
+  /** perm[alt] = neu, wenn der Block [from, from+count) vor Position `to` (alte Nummerierung) wandert */
+  function blockPerm(n, from, count, to) {
+    if (from < 0 || count < 1 || from + count > n || to < 0 || to > n) return null;
+    if (to >= from && to <= from + count) return null;
+    const idx = Array.from({ length: n }, (_, i) => i);
+    const block = idx.splice(from, count);
+    idx.splice(to > from ? to - count : to, 0, ...block);
+    const perm = new Array(n);
+    idx.forEach((old, nw) => { perm[old] = nw; });
+    return perm;
+  }
+
+  /** Zeilen/Spalten einer Tabelle umordnen. Gibt false zurück, wenn verbundene Zellen im Weg sind. */
+  function permuteTable(tbl, kind, perm) {
+    const gr = T.grid(tbl);
+    const items = [];
+    for (const row of gr.g) for (const x of row) {
+      if (!x || !x.origin) continue;
+      let nr = x.r0, nc = x.c0;
+      if (kind === 'row') { nr = perm[x.r0]; for (let k = 1; k < x.rs; k++) if (perm[x.r0 + k] !== nr + k) return false; }
+      else { nc = perm[x.c0]; for (let k = 1; k < x.cs; k++) if (perm[x.c0 + k] !== nc + k) return false; }
+      items.push({ cell: x.cell, r0: x.r0, c0: x.c0, nr, nc });
+    }
+    const rows = gr.rows;
+    let target = rows;
+    if (kind === 'row') { const inv = []; perm.forEach((nw, old) => { inv[nw] = old; }); target = inv.map((old) => rows[old]); }
+    items.forEach((it) => it.cell.remove());
+    if (kind === 'row') {
+      const parents = rows.map((tr) => tr.parentNode);
+      rows.forEach((tr) => tr.remove());
+      target.forEach((tr, i) => parents[i].appendChild(tr));
+    }
+    const byRow = target.map(() => []);
+    items.forEach((it) => byRow[kind === 'row' ? it.nr : it.r0].push(it));
+    byRow.forEach((list, i) => { list.sort((a, b) => a.nc - b.nc); list.forEach((it) => target[i].appendChild(it.cell)); });
+    if (kind === 'col') {
+      const w = colWidths(tbl), nw = [];
+      w.forEach((v, i) => { nw[perm[i]] = v; });
+      setColWidths(tbl, nw);
+    }
+    // Kontrolle: jede Zelle muss genau dort liegen, wo sie hin sollte
+    const g2 = T.grid(tbl);
+    if (g2.nc !== gr.nc || g2.nr !== gr.nr) return false;
+    const where = new Map();
+    g2.g.forEach((row) => row.forEach((x) => { if (x && x.origin) where.set(x.cell, x); }));
+    return items.every((it) => {
+      const pos = where.get(it.cell);
+      return pos && pos.r0 === (kind === 'row' ? it.nr : it.r0) && pos.c0 === (kind === 'row' ? it.c0 : it.nc);
+    });
+  }
+  function tryPermute(table, kind, perm) {
+    if (!permuteTable(table.cloneNode(true), kind, perm)) return false;     // Probelauf an einer Kopie
+    return permuteTable(table, kind, perm);
+  }
+
+  /** Zusammenhängende Zeilen (tr-Elemente) vor die Zeile `beforeRow` verschieben (null = ans Ende) */
+  function caretKeeper() {
+    const r = W.sel.range(W.el.flow);
+    const keep = r && r.collapsed ? { node: r.startContainer, offset: r.startOffset } : null;
+    const had = T.rect ? T.rect.kind : null;
+    return { had, restore() {
+      if (!keep || !keep.node.isConnected) return false;
+      const rg = document.createRange();
+      try { rg.setStart(keep.node, keep.offset); rg.collapse(true); } catch (e) { return false; }
+      W.el.flow.focus({ preventScroll: true });
+      const s = getSelection(); s.removeAllRanges(); s.addRange(rg);
+      return true;
+    } };
+  }
+  T.moveRows = function (rows, beforeRow) {
+    if (!rows.length) return false;
+    let ok = false;
+    W.edit(() => {
+      const ck = caretKeeper();
+      const table = rows[0].closest('table');         // nach dem Vereinen weich geteilter Tabellen
+      const gr = T.grid(table);
+      const idx = rows.map((tr) => tr.rowIndex).sort((a, b) => a - b);
+      const from = idx[0], count = idx[idx.length - 1] - from + 1;
+      if (count !== idx.length) { W.toast('Es können nur zusammenhängende Zeilen verschoben werden.'); return false; }
+      const perm = blockPerm(gr.nr, from, count, beforeRow ? beforeRow.rowIndex : gr.nr);
+      if (!perm) return false;
+      if (!tryPermute(table, 'row', perm)) { W.toast('Verbundene Zellen verhindern das Verschieben dieser Zeile.'); return false; }
+      ok = true;
+      if (ck.had === 'row' || !ck.restore()) T.selectRows(table, perm[from], perm[from] + count - 1);
+    });
+    return ok;
+  };
+  T.moveColumns = function (table, from, count, to) {
+    let ok = false;
+    table = T.headOf(table);
+    W.edit(() => {
+      const ck = caretKeeper();
+      const gr = T.grid(table);
+      const perm = blockPerm(gr.nc, from, count, to);
+      if (!perm) return false;
+      if (!tryPermute(table, 'col', perm)) { W.toast('Verbundene Zellen verhindern das Verschieben dieser Spalte.'); return false; }
+      ok = true;
+      if (ck.had === 'col' || !ck.restore()) T.selectColumns(table, perm[from], perm[from] + count - 1);
+    });
+    return ok;
+  };
+
+  /** Ausgewählte Zeilen um eine Position nach oben (-1) oder unten (+1) schieben */
+  // Bei einer Spalten- oder Tabellenauswahl zählt für Zeilen nur die Zelle, in der der Cursor steht (und umgekehrt)
+  const cellsFor = (kind) => {
+    const cells = T.selectedCells();
+    return T.rect && cells.length && T.rect.kind !== kind ? [T.rect.anchor] : cells;
+  };
+  T.moveRowBy = function (delta) {
+    const cells = cellsFor('row'); if (!cells.length) return false;
+    const table = T.headOf(cells[0].closest('table'));
+    const all = T.allRows(table);
+    let a = 1e9, b = -1;
+    cells.forEach((c) => { const i = all.indexOf(c.parentElement); if (i < 0) return; a = Math.min(a, i); b = Math.max(b, i + (c.rowSpan || 1) - 1); });
+    if (b < 0) return false;
+    if (delta < 0) return a > 0 ? T.moveRows(all.slice(a, b + 1), all[a - 1]) : false;
+    return b < all.length - 1 ? T.moveRows(all.slice(a, b + 1), all[b + 2] || null) : false;
+  };
+  T.moveColumnBy = function (delta) {
+    const cells = cellsFor('col'); if (!cells.length) return false;
+    const table = T.headOf(cells[0].closest('table'));
+    let a = 1e9, b = -1;
+    cells.forEach((c) => {
+      const gr = T.grid(c.closest('table'));
+      const pos = gr.g.flat().find((x) => x && x.cell === c && x.origin);
+      if (pos) { a = Math.min(a, pos.c0); b = Math.max(b, pos.c0 + pos.cs - 1); }
+    });
+    if (b < 0) return false;
+    const nc = T.grid(table).nc, count = b - a + 1;
+    if (delta < 0) return a > 0 ? T.moveColumns(table, a, count, a - 1) : false;
+    return b < nc - 1 ? T.moveColumns(table, a, count, b + 2) : false;
+  };
+
+  /** Inhalt der gewählten Zellen löschen (Entf bei Zeilen-/Spaltenauswahl) */
+  T.clearCells = function () {
+    const cells = T.selectedCells(); if (!cells.length) return;
+    W.edit(() => { cells.forEach((c) => { c.innerHTML = '<p><br></p>'; }); });
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  Größe: Breite, Höhe, Spaltenbreite                                  */
+  /* ------------------------------------------------------------------ */
+  const zoom = () => (W.view && W.view.zoom) || 1;
+  const availWidth = (t) => parseFloat(t.style.getPropertyValue('--lw')) || (t.parentNode && t.parentNode.clientWidth) || 600;
+  /** Maße der Tabelle in px (ungezoomt): Breite, Gesamthöhe, verfügbare Breite */
+  T.metrics = function (table) {
+    table = T.headOf(table);
+    const z = zoom();
+    const rows = T.allRows(table);
+    return {
+      width: table.getBoundingClientRect().width / z,
+      avail: availWidth(table),
+      height: rows.reduce((a, tr) => a + tr.getBoundingClientRect().height / z, 0),
+      rows: rows.length,
+    };
+  };
+  T.setWidth = function (px) {
+    const t = T.currentTable(); if (!t || !px) return;
+    const f = W.clamp(px / availWidth(t), 0.1, 1);
+    W.edit(() => { t.style.setProperty('--tw', f.toFixed(4)); });
+  };
+  T.setHeight = function (px) {
+    const t = T.currentTable(); if (!t) return;
+    W.edit(() => {
+      const rows = T.allRows(t);
+      if (!px) { rows.forEach((tr) => tr.style.removeProperty('height')); return; }
+      const hs = rows.map((tr) => tr.getBoundingClientRect().height / zoom());
+      const f = px / (hs.reduce((a, b) => a + b, 0) || 1);
+      rows.forEach((tr, i) => { tr.style.height = Math.max(8, hs[i] * f).toFixed(1) + 'px'; });
+    });
+  };
+  /** Breite einer Gitterspalte setzen; Tabellenbreite bleibt gleich, die übrigen Spalten geben/nehmen anteilig */
+  T.setColumnWidth = function (px, colIndex, cellsOverride) {
+    const t = T.currentTable(); if (!t || !px) return;
+    W.edit(() => {
+      const gr = T.grid(t);
+      if (colIndex == null) {
+        const cells = cellsOverride || T.selectedCells(); if (!cells.length) return false;
+        const pos = T.grid(cells[0].closest('table')).g.flat().find((x) => x && x.cell === cells[0] && x.origin);
+        if (!pos) return false;
+        colIndex = pos.c0;
+      }
+      if (gr.nc < 2 || colIndex >= gr.nc) return false;
+      const tot = t.getBoundingClientRect().width / zoom();
+      const w = colWidths(t).map((v) => v / 100 * tot);
+      const others = w.reduce((a, v, i) => a + (i === colIndex ? 0 : v), 0);
+      const want = W.clamp(px, 18, tot - 18 * (gr.nc - 1));
+      const rest = tot - want, k = rest / (others || 1);
+      setColWidths(t, w.map((v, i) => (i === colIndex ? want : v * k)));
+    });
+  };
+
+  /* ---------- Tastatur: Tab / Umschalt+Tab, Verschieben, Entf bei Auswahl ---------- */
   T.onKeydown = function (e) {
-    if (e.key !== 'Tab') return false;
     const r = W.sel.range(W.el.flow);
     if (!r) return false;
     const cell = T.cellOf(r.startContainer);
     if (!cell) return false;
+    if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && /^Arrow(Up|Down|Left|Right)$/.test(e.key)) {
+      e.preventDefault();
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') T.moveRowBy(e.key === 'ArrowUp' ? -1 : 1);
+      else T.moveColumnBy(e.key === 'ArrowLeft' ? -1 : 1);
+      return true;
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && rectValid()) { e.preventDefault(); T.clearCells(); return true; }
+    if (e.key === 'Escape' && T.rect) { T.clearRect(); return true; }
+    if (e.key !== 'Tab') return false;
     e.preventDefault();
     const table = cell.closest('table');
     const all = Array.from(table.querySelectorAll('td,th')).filter((c) => c.closest('table') === table);
@@ -468,75 +779,127 @@
 
   /* ---------- Zellauswahl hervorheben ---------- */
   let hl = [];
-  W.on('selection', () => {
-    const r = W.sel.range(W.el.flow);
+  function highlight() {
     const want = [];
-    if (r && !r.collapsed) {
-      const sc = T.cellOf(r.startContainer), ec = T.cellOf(r.endContainer);
-      if (sc || ec) {
-        const cells = T.selectedCells();
-        if (cells.length > 1 || (cells.length === 1 && sc !== ec)) want.push(...cells);
+    if (rectValid()) want.push(...T.rect.cells);
+    else {
+      const r = W.sel.range(W.el.flow);
+      if (r && !r.collapsed) {
+        const sc = T.cellOf(r.startContainer), ec = T.cellOf(r.endContainer);
+        if (sc || ec) {
+          const cells = T.selectedCells();
+          if (cells.length > 1 || (cells.length === 1 && sc !== ec)) want.push(...cells);
+        }
       }
     }
     hl.forEach((c) => { if (!want.includes(c)) c.classList.remove('cell-sel'); });
     want.forEach((c) => c.classList.add('cell-sel'));
     hl = want;
-    W.emit('tablecontext', T.currentTable());
-  });
+  }
+  W.on('selection', () => { highlight(); W.emit('tablecontext', T.currentTable()); });
+  // Klick irgendwo anders (nicht auf einen Griff) hebt die Zeilen-/Spaltenauswahl auf
+  document.addEventListener('mousedown', (ev) => {
+    if (T.rect && !(ev.target.closest && ev.target.closest('.tg,.tgbar,.menu,.modal-back,#ribbon'))) T.clearRect();
+  }, true);
+  W.on('restored', () => { T.rect = null; hl = []; });
 
-  /* ---------- Spaltenbreite per Maus ---------- */
+  /* ------------------------------------------------------------------ */
+  /*  Größenänderung per Maus: Spaltenrand, Zeilenunterkante, rechter Rand */
+  /* ------------------------------------------------------------------ */
   let drag = null;
-  const zoom = () => (W.view && W.view.zoom) || 1;
   function edgeAt(ev) {
-    const td = ev.target.closest && ev.target.closest('td,th');
+    const tol = 4 * zoom();
+    let td = ev.target.closest && ev.target.closest('td,th');
+    if (!td && ev.target.closest && ev.target.closest('#pages,#zoomsizer,#workspace')) {
+      // knapp rechts neben der Tabelle: nach der letzten Spalte suchen
+      const el = document.elementFromPoint(ev.clientX - tol, ev.clientY);
+      td = el && el.closest && el.closest('td,th');
+    }
     if (!td || !W.el.flow.contains(td)) return null;
     const rc = td.getBoundingClientRect();
-    const tol = 4 * zoom();
     if (Math.abs(ev.clientX - rc.right) <= tol) return { td, side: 'right' };
     if (Math.abs(ev.clientX - rc.left) <= tol) return { td, side: 'left' };
+    if (Math.abs(ev.clientY - rc.bottom) <= tol) return { td, side: 'bottom' };
+    if (Math.abs(ev.clientY - rc.top) <= tol) return { td, side: 'top' };
     return null;
   }
-  W.el.flow && 0;
+  const setClasses = (e) => {
+    const horiz = !!e && (e.side === 'bottom' || e.side === 'top');
+    document.body.classList.toggle('col-resize', !!e && !horiz);
+    document.body.classList.toggle('row-resize', horiz);
+  };
   document.addEventListener('mousemove', (ev) => {
     if (drag) {
-      const dx = (ev.clientX - drag.x0) / zoom();
+      const z = zoom();
+      if (drag.mode === 'row') {
+        drag.tr.style.height = Math.max(10, drag.h0 + (ev.clientY - drag.y0) / z).toFixed(1) + 'px';
+        W.layout.schedule();
+        return;
+      }
+      if (drag.mode === 'width') {
+        const f = W.clamp((drag.w0 + (ev.clientX - drag.x0) / z) / drag.avail, 0.1, 1);
+        T.pieces(drag.table).forEach((t) => t.style.setProperty('--tw', f.toFixed(4)));
+        W.layout.schedule();
+        return;
+      }
+      const dx = (ev.clientX - drag.x0) / z;
       const w = drag.widths.slice();
       const a = drag.a, b = drag.b;
       const min = 18;
       const d = W.clamp(dx, min - w[a], w[b] - min);
       w[a] += d; w[b] -= d;
       const tot = w.reduce((x, y) => x + y, 0);
-      const cols = colEls(drag.table);
-      w.forEach((v, i) => { if (cols[i]) cols[i].style.width = (v / tot * 100).toFixed(3) + '%'; });
+      T.pieces(drag.table).forEach((piece) => {
+        const cols = colEls(piece);
+        w.forEach((v, i) => { if (cols[i]) cols[i].style.width = (v / tot * 100).toFixed(3) + '%'; });
+      });
       return;
     }
-    if (!W.el.flow || !W.el.flow.contains(ev.target)) { document.body.classList.remove('col-resize'); return; }
-    document.body.classList.toggle('col-resize', !!edgeAt(ev));
+    setClasses(edgeAt(ev));
   });
   document.addEventListener('mousedown', (ev) => {
     if (ev.button !== 0) return;
     const e = edgeAt(ev);
     if (!e) return;
-    const table = e.td.closest('table');
-    const gr = T.grid(table);
+    const piece = e.td.closest('table');
+    const head = T.headOf(piece);
+    const gr = T.grid(piece);
     const pos = gr.g.flat().find((x) => x && x.cell === e.td && x.origin);
     if (!pos) return;
-    let a = e.side === 'right' ? pos.c0 + pos.cs - 1 : pos.c0 - 1;
+    const nested = piece.parentNode !== W.el.flow;
+    if (e.side === 'bottom' || e.side === 'top') {
+      // Unterkante dieser Zeile bzw. Oberkante = Unterkante der Zeile darüber
+      let tr = e.side === 'bottom' ? gr.rows[pos.r0 + pos.rs - 1] : null;
+      if (!tr) { const all = T.allRows(head); const i = all.indexOf(gr.rows[pos.r0]); tr = i > 0 ? all[i - 1] : null; }
+      if (!tr) return;
+      ev.preventDefault();
+      drag = { mode: 'row', tr, y0: ev.clientY, h0: tr.getBoundingClientRect().height / zoom() };
+      return;
+    }
+    const a = e.side === 'right' ? pos.c0 + pos.cs - 1 : pos.c0 - 1;
     const b = a + 1;
-    if (a < 0 || b >= gr.nc) return;
+    if (a < 0) return;
+    if (b >= gr.nc) {
+      // rechter Rand der letzten Spalte = Tabellenbreite
+      if (nested || e.side !== 'right') return;
+      ev.preventDefault();
+      drag = { mode: 'width', table: head, x0: ev.clientX, w0: head.getBoundingClientRect().width / zoom(), avail: availWidth(head) };
+      return;
+    }
     ev.preventDefault();
-    const rcT = table.getBoundingClientRect();
-    const cols = colEls(table);
-    if (cols.length !== gr.nc) setColWidths(table, Array(gr.nc).fill(1));
-    const wpx = colEls(table).map((c, i) => {
+    const rcT = piece.getBoundingClientRect();
+    const cols = colEls(piece);
+    if (cols.length !== gr.nc) T.pieces(head).forEach((t) => setColWidths(t, Array(gr.nc).fill(1)));
+    const wpx = colEls(piece).map((c, i) => {
       const cell = gr.g.flat().find((x) => x && x.c0 === i && x.origin && x.cs === 1);
       return cell ? cell.cell.getBoundingClientRect().width / zoom() : rcT.width / zoom() / gr.nc;
     });
-    drag = { table, a, b, x0: ev.clientX, widths: wpx };
+    drag = { mode: 'col', table: head, a, b, x0: ev.clientX, widths: wpx };
   }, true);
   document.addEventListener('mouseup', () => {
     if (!drag) return;
     drag = null;
+    setClasses(null);
     W.layout.schedule(true);
     W.history.push();
   });

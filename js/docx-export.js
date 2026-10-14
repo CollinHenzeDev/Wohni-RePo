@@ -608,8 +608,10 @@
         if (g.rs > 1) tc += '<w:vMerge w:val="restart"/>';
         let bd = '';
         [['top', 'Top'], ['left', 'Left'], ['bottom', 'Bottom'], ['right', 'Right']].forEach(([k, K]) => {
-          const bw = parseFloat(cs['border' + K + 'Width']), bs = cs['border' + K + 'Style'];
-          if (bs && bs !== 'none' && bw > 0) bd += `<w:${k} w:val="${bs === 'double' ? 'double' : bs === 'dashed' ? 'dashed' : bs === 'dotted' ? 'dotted' : 'single'}" w:sz="${Math.max(2, Math.round(bw * 6))}" w:space="0" w:color="${hex6(cs['border' + K + 'Color']) || 'auto'}"/>`;
+          // eingestellte Breite (Bruchteile von px) aus dem Inline-Stil; berechnete Werte sind auf ganze Pixel gerundet
+          const iw = parseFloat(cell.style['border' + K + 'Width']);
+          const bw = iw > 0 ? iw : parseFloat(cs['border' + K + 'Width']), bs = cs['border' + K + 'Style'];
+          if (bs && bs !== 'none' && bw > 0) bd += `<w:${k} w:val="${bs === 'double' ? 'double' : bs === 'dashed' ? 'dashed' : bs === 'dotted' ? 'dotted' : 'single'}" w:sz="${Math.min(96, Math.max(2, Math.round(bw * 6)))}" w:space="0" w:color="${hex6(cs['border' + K + 'Color']) || 'auto'}"/>`;
           else bd += `<w:${k} w:val="nil"/>`;
         });
         tc += `<w:tcBorders>${bd}</w:tcBorders>`;

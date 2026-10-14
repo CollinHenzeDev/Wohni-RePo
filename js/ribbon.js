@@ -53,7 +53,7 @@
     // o: {icon, label, tip, key, apply(color|null), none, highlight}
     const cur = { c: o.init || null };
     const s = split({
-      icon: o.icon, label: o.label, tip: o.tip, size: o.size || 'sm',
+      icon: o.icon, label: o.label, tip: o.tip, size: o.size || 'sm', showLabel: o.showLabel,
       fn: () => o.apply(cur.c),
       menu: (anchor) => { ui.colorMenu(s, { current: cur.c, none: o.none, highlight: o.highlight, onPick: (c) => { cur.c = c; setBar(c); o.apply(c); } }); return null; },
     });
@@ -420,16 +420,44 @@
   }
 
   function buildTable() {
+    const T = () => W.tables;
+    const selectMenu = () => [
+      { icon: 'selectTable', label: 'Tabelle markieren', fn: () => { const t = T().currentTable(); if (t) T().selectTable(t); } },
+      { label: 'Zeile markieren', fn: () => { const c = T().selectedCells()[0]; if (c) { const i = T().logicalRowIndex(c.parentElement); T().selectRows(T().currentTable(), i, i); } } },
+      { label: 'Spalte markieren', fn: () => { const c = T().selectedCells()[0]; if (!c) return; const gr = T().grid(c.closest('table')); const p = gr.g.flat().find((x) => x && x.cell === c && x.origin); if (p) T().selectColumns(T().currentTable(), p.c0, p.c0 + p.cs - 1); } },
+    ];
+    const penStyleMenu = () => T().PEN_STYLES.map(([id, label]) => ({ label, checked: T().pen.style === id, fn: () => T().setPen({ style: id }) }));
+    const penWidthMenu = () => T().PEN_WIDTHS.map((pt) => ({ label: String(pt).replace('.', ',') + ' pt', checked: Math.abs(T().pen.width - pt * 96 / 72) < 0.2, fn: () => T().setPen({ width: pt * 96 / 72 }) }));
+    const bordersMenu = () => tableBordersMenu().concat([{ sep: true }, { icon: 'tblprops', label: 'Rahmen und Tabelleneigenschaften …', fn: () => W.dialogs.tableProps() }]);
+    const cmField = (label, key, tipTxt, onChange, step) => field(label, numInput({ value: 0, step: step || 0.1, min: 0, key, tip: tipTxt, onChange }));
     return [
-      group('Tabelle', [btn({ icon: 'delTable', label: 'Löschen', size: 'lg', fn: () => W.tables.deleteTable() })]),
+      group('Tabelle', [
+        col(btn({ icon: 'selectTable', label: 'Markieren', fn: null, menu: selectMenu, showLabel: true }), btn({ icon: 'tblprops', label: 'Eigenschaften', tip: 'Tabelleneigenschaften (Größe, Innenabstand, Rahmen)', fn: () => W.dialogs.tableProps(), showLabel: true })),
+        btn({ icon: 'delTable', label: 'Löschen', size: 'lg', fn: () => W.tables.deleteTable() }),
+      ]),
       group('Zeilen und Spalten', [
         col(btn({ icon: 'rowAbove', label: 'Oberhalb einfügen', fn: () => W.tables.addRow(false), showLabel: true }), btn({ icon: 'rowBelow', label: 'Unterhalb einfügen', fn: () => W.tables.addRow(true), showLabel: true }), btn({ icon: 'delRow', label: 'Zeilen löschen', fn: () => W.tables.deleteRow(), showLabel: true })),
         col(btn({ icon: 'colLeft', label: 'Links einfügen', fn: () => W.tables.addColumn(false), showLabel: true }), btn({ icon: 'colRight', label: 'Rechts einfügen', fn: () => W.tables.addColumn(true), showLabel: true }), btn({ icon: 'delCol', label: 'Spalten löschen', fn: () => W.tables.deleteColumn(), showLabel: true })),
       ]),
+      group('Verschieben', [
+        col(btn({ icon: 'moveRowUp', label: 'Zeile nach oben', tip: 'Zeile nach oben verschieben (Alt+Umschalt+↑)', fn: () => W.tables.moveRowBy(-1), showLabel: true }), btn({ icon: 'moveRowDown', label: 'Zeile nach unten', tip: 'Zeile nach unten verschieben (Alt+Umschalt+↓)', fn: () => W.tables.moveRowBy(1), showLabel: true })),
+        col(btn({ icon: 'moveColLeft', label: 'Spalte nach links', tip: 'Spalte nach links verschieben (Alt+Umschalt+←)', fn: () => W.tables.moveColumnBy(-1), showLabel: true }), btn({ icon: 'moveColRight', label: 'Spalte nach rechts', tip: 'Spalte nach rechts verschieben (Alt+Umschalt+→)', fn: () => W.tables.moveColumnBy(1), showLabel: true })),
+      ]),
+      group('Zellengröße', [
+        col(
+          row(cmField('Tabellenbreite', 'tblw', 'Breite der Tabelle (cm)', (v) => v > 0 && W.tables.setWidth(W.u.cm2px(v))), cmField('Zeilenhöhe', 'tblrowh', 'Mindesthöhe der Zeile (cm), 0 = automatisch', (v) => W.tables.setRowHeight(v > 0 ? W.u.cm2px(v) : 0))),
+          row(cmField('Tabellenhöhe', 'tblh', 'Gesamthöhe der Tabelle (cm), 0 = automatisch', (v) => W.tables.setHeight(v > 0 ? W.u.cm2px(v) : 0)), cmField('Spaltenbreite', 'tblcolw', 'Breite der Spalte (cm)', (v) => v > 0 && W.tables.setColumnWidth(W.u.cm2px(v)))),
+        ),
+        col(btn({ icon: 'distribute', label: 'Spalten verteilen', fn: () => W.tables.distributeColumns(), showLabel: true }), btn({ icon: 'distributeRows', label: 'Zeilen verteilen', fn: () => W.tables.distributeRows(), showLabel: true })),
+      ]),
+      group('Rahmen', [
+        col(btn({ icon: 'penStyle', label: 'Linienart', tip: 'Linienart der Rahmenlinien', menu: penStyleMenu, showLabel: true }), btn({ icon: 'penWeight', label: 'Linienstärke', tip: 'Linienstärke der Rahmenlinien', menu: penWidthMenu, showLabel: true }),
+          colorBtn({ icon: 'outline', label: 'Stiftfarbe', showLabel: true, tip: 'Farbe der Rahmenlinien', key: 'penColor', init: '#000000', apply: (c) => W.tables.setPen({ color: c || '#000000' }), barInit: '#000000' })),
+        btn({ icon: 'borders', label: 'Rahmen', size: 'lg', tip: 'Rahmenlinien anwenden (mit Linienart, -stärke und -farbe)', menu: bordersMenu }),
+      ], { launcher: () => W.dialogs.tableProps(), launcherTip: 'Tabelleneigenschaften' }),
       group('Zusammenführen', [col(btn({ icon: 'merge', label: 'Zellen verbinden', fn: () => W.tables.mergeCells(), showLabel: true }), btn({ icon: 'split', label: 'Zellen teilen', fn: () => W.tables.splitCell(2), showLabel: true }))]),
-      group('Zellengröße', [col(btn({ icon: 'distribute', label: 'Spalten verteilen', fn: () => W.tables.distributeColumns(), showLabel: true }), btn({ icon: 'valign', label: 'Zeilenhöhe…', fn: () => W.cmd.rowHeight(), showLabel: true }))]),
       group('Ausrichtung', [col(row(btn({ icon: 'alignLeft', tip: 'Linksbündig', cmd: 'alignLeft' }), btn({ icon: 'alignCenter', tip: 'Zentriert', cmd: 'alignCenter' }), btn({ icon: 'alignRight', tip: 'Rechtsbündig', cmd: 'alignRight' })), row(btn({ icon: 'valign', label: 'Oben', fn: () => W.tables.setVAlign('top'), showLabel: true }), btn({ label: 'Mitte', fn: () => W.tables.setVAlign('middle'), showLabel: true }), btn({ label: 'Unten', fn: () => W.tables.setVAlign('bottom'), showLabel: true })))]),
-      group('Tabellenformatvorlagen', [btn({ icon: 'tablestyle', label: 'Formatvorlagen', size: 'lg', menu: tableStyleMenu }), colorBtn({ icon: 'shading', tip: 'Zellschattierung', none: 'Keine Farbe', apply: (c) => W.tables.setShading(c), barInit: '#ffffff' }), btn({ icon: 'borders', label: 'Rahmen', tip: 'Rahmen', menu: tableBordersMenu })]),
+      group('Tabellenformatvorlagen', [btn({ icon: 'tablestyle', label: 'Formatvorlagen', size: 'lg', menu: tableStyleMenu }), colorBtn({ icon: 'shading', tip: 'Zellschattierung', none: 'Keine Farbe', apply: (c) => W.tables.setShading(c), barInit: '#ffffff' })]),
     ];
   }
 
@@ -662,10 +690,30 @@
       W.emit('state');
     });
     W.on('objgeom', (fl) => { const set = (key, v) => (R.fields || []).filter((x) => x.key === key).forEach((x) => { if (document.activeElement !== x.el) x.el.value = v; }); set('objw', u.px2cm(fl.w).toFixed(2)); set('objh', u.px2cm(fl.h).toFixed(2)); });
+    let tfKey = '', tfRaf = 0;
+    const updateTableFields = () => {
+      tfRaf = 0;
+      const t = W.tables.currentTable(); if (!t || !R.ctx.table) return;
+      const set = (key, v) => (R.fields || []).filter((x) => x.key === key).forEach((x) => { if (document.activeElement !== x.el) x.el.value = v; });
+      const m = W.tables.metrics(t), z = W.view.zoom;
+      const c = W.tables.selectedCells()[0];
+      set('tblw', u.px2cm(m.width).toFixed(2)); set('tblh', u.px2cm(m.height).toFixed(2));
+      if (c) {
+        set('tblrowh', u.px2cm(c.parentElement.getBoundingClientRect().height / z).toFixed(2));
+        set('tblcolw', u.px2cm(c.getBoundingClientRect().width / z).toFixed(2));
+      }
+    };
+    const scheduleTableFields = (force) => { if (force || !tfRaf) { if (!tfRaf) tfRaf = requestAnimationFrame(updateTableFields); } };
     W.on('tablecontext', (t) => {
       const on = !!t && !W.floats.selected;
       if (!!R.ctx.table !== on) { R.showContext('table', on); }
+      const c = on && W.tables.selectedCells()[0];
+      const key = on ? (c ? c.parentElement.rowIndex + ':' + (c.cellIndex) + ':' + (t._tid = t._tid || Math.random()) : 'x') : '';
+      if (on && key !== tfKey) { tfKey = key; scheduleTableFields(); }
+      if (!on) tfKey = '';
     });
+    W.on('layout', () => { if (R.ctx.table) { tfKey = tfKey + ''; scheduleTableFields(); } });
+    W.on('pen', () => { (R.colorBars || []).forEach((c) => { if (c.key === 'penColor' && c.set) c.set(W.tables.pen.color); }); });
     W.on('hf-edit', () => W.emit('state'));
   }
 

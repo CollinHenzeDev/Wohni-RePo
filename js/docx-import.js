@@ -240,7 +240,7 @@
         case 'ind': o.ind = { left: A(c, 'left') ?? A(c, 'start'), right: A(c, 'right') ?? A(c, 'end'), firstLine: A(c, 'firstLine'), hanging: A(c, 'hanging') }; break;
         case 'spacing': o.spacing = { before: A(c, 'before'), after: A(c, 'after'), line: A(c, 'line'), lineRule: A(c, 'lineRule'), bA: A(c, 'beforeAutospacing'), aA: A(c, 'afterAutospacing') }; break;
         case 'shd': { const f = wColor(ctx, c, 'fill', 'themeFill'); if (f && A(c, 'val') !== 'nil') o.shd = f; break; }
-        case 'pBdr': o.bdr = {}; kids(c).forEach((b) => { o.bdr[b.localName] = { val: A(b, 'val'), sz: A(b, 'sz'), space: A(b, 'space'), color: wColor(ctx, b) }; }); break;
+        case 'pBdr': o.bdr = {}; kids(c).forEach((b) => { o.bdr[b.localName] = { val: A(b, 'val'), sz: A(b, 'sz'), space: A(b, 'space'), color: wColor(ctx, b, 'color', 'themeColor') }; }); break;
         case 'keepNext': o.keepNext = onoff(c); break;
         case 'keepLines': o.keepLines = onoff(c); break;
         case 'contextualSpacing': o.ctx = onoff(c); break;
@@ -430,7 +430,7 @@
       if (mar) { o.t = u.tw2px(+A(mar, 'top')); o.b = u.tw2px(+A(mar, 'bottom')); o.l = u.tw2px(+A(mar, 'left')); o.r = u.tw2px(+A(mar, 'right')); o.hd = u.tw2px(+A(mar, 'header') || 708); o.fd = u.tw2px(+A(mar, 'footer') || 708); }
       o.cols = readCols(cols);
       const pb = kid(sp, 'pgBorders');
-      if (pb) { const b = kid(pb, 'top') || kid(pb, 'left'); if (b && A(b, 'val') !== 'nil' && A(b, 'val') !== 'none') o.border = { color: wColor(ctx, b) || '#000000', width: Math.max(1, (+A(b, 'sz') || 8) / 8 * 96 / 72), offset: u.pt2px(+A(b, 'space') || 24), style: A(b, 'val') === 'double' ? 'double' : /dash/.test(A(b, 'val')) ? 'dashed' : /dot/.test(A(b, 'val')) ? 'dotted' : 'solid' }; }
+      if (pb) { const b = kid(pb, 'top') || kid(pb, 'left'); if (b && A(b, 'val') !== 'nil' && A(b, 'val') !== 'none') o.border = { color: wColor(ctx, b, 'color', 'themeColor') || '#000000', width: Math.max(1, (+A(b, 'sz') || 8) / 8 * 96 / 72), offset: u.pt2px(+A(b, 'space') || 24), style: A(b, 'val') === 'double' ? 'double' : /dash/.test(A(b, 'val')) ? 'dashed' : /dot/.test(A(b, 'val')) ? 'dotted' : 'solid' }; }
       o.titlePg = !!kid(sp, 'titlePg');
       o.refs = kids(sp).filter((c) => c.localName === 'headerReference' || c.localName === 'footerReference').map((c) => ({ kind: c.localName === 'headerReference' ? 'header' : 'footer', type: A(c, 'type'), id: A(c, 'id', NS.r) }));
       return o;
@@ -917,7 +917,7 @@
     if (!el) return o;
     kids(el).forEach((b) => {
       const v = A(b, 'val');
-      o[b.localName] = (!v || v === 'nil' || v === 'none') ? null : { sz: +A(b, 'sz') || 4, color: wColor(ctx, b) || '#000000', style: v === 'double' ? 'double' : /dash/.test(v) ? 'dashed' : /dot/.test(v) ? 'dotted' : 'solid' };
+      o[b.localName] = (!v || v === 'nil' || v === 'none') ? null : { sz: +A(b, 'sz') || 4, color: wColor(ctx, b, 'color', 'themeColor') || '#000000', style: v === 'double' ? 'double' : /dash/.test(v) ? 'dashed' : /dot/.test(v) ? 'dotted' : 'solid' };
     });
     return o;
   }

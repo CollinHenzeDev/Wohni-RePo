@@ -328,3 +328,23 @@ body.col-resize #flow { cursor: col-resize; }
   .brand .appname, .qbtn.wide { display: none; }
   .doctitle { width: 140px; }
 }
+
+/* ---- Tabellen: Griffe, Werkzeugleiste, Ziehen -------------------------------------- */
+body.row-resize #flow { cursor: row-resize; }
+body.tg-dragging, body.tg-dragging * { cursor: grabbing !important; user-select: none; }
+.tblui { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 30; }
+.tg { position: absolute; pointer-events: auto; box-sizing: border-box; background: #d5deee; border: calc(1px / var(--zoom, 1)) solid #9bb0d3; border-radius: calc(3px / var(--zoom, 1)); opacity: .9; }
+.tg-col, .tg-row { cursor: grab; }
+.tg:hover { background: #a9c1ea; }
+.tg.on { background: #2b79d7; border-color: #1d5cab; }
+.tg-all { cursor: pointer; background: #d5deee url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><path d='M5 1v8M1 5h8M5 1L3.5 2.5M5 1l1.5 1.5M5 9L3.5 7.5M5 9l1.5-1.5M1 5l1.5-1.5M1 5l1.5 1.5M9 5L7.5 3.5M9 5L7.5 6.5' stroke='%23345' stroke-width='.8' fill='none'/></svg>") center / 80% no-repeat; }
+.tg-all.on { background-color: #2b79d7; }
+.tg-size { cursor: nwse-resize; background: #fff; border-color: #2b79d7; border-radius: 2px; }
+.tg-drop { position: absolute; background: #2b79d7; border-radius: 2px; pointer-events: none; box-shadow: 0 0 0 calc(1px / var(--zoom, 1)) rgba(255, 255, 255, .8); }
+.tgbar { position: absolute; display: flex; gap: 2px; padding: 2px; background: var(--ui-bg, #fff); border: 1px solid var(--ui-line, #c7ccd6); border-radius: 6px; box-shadow: 0 3px 10px rgba(0, 0, 0, .22); pointer-events: auto; transform-origin: 0 0; white-space: nowrap; }
+.tgb { width: 24px; height: 24px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 4px; color: inherit; cursor: pointer; padding: 0; }
+.tgb:hover { background: rgba(43, 121, 215, .16); }
+.tgb.del:hover { background: rgba(200, 0, 0, .15); }
+body.dark .tg { background: #46526a; border-color: #6b7fa5; }
+body.dark .tg.on { background: #2b79d7; }
+.tgbar.v { flex-direction: column; }

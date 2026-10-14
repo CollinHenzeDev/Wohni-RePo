@@ -18,3 +18,5 @@ Einheitliche Wörter für Code, Tests und Doku. Maße werden intern in **CSS-Pix
 | **Listenabsatz** | Absatz mit `data-list="b|n"`, `data-lvl`, `data-lid`; die Marke (`data-mark`) wird berechnet, nicht gespeichert. |
 | **Tabulator-Zeichen** (`.tabc`) | Tabulator in einem Absatz mit eigenen Tabstopps (`data-tabs`); seine Breite setzt die Layout-Engine. |
 | **Snapshot** | Ein Schritt der Rückgängig-Historie: bereinigtes HTML + Modell + Cursor. |
+| **Auswahlrechteck** (`T.rect`) | Zeilen-, Spalten- oder Tabellenauswahl über die Griffe an der Tabelle (`tables-ui.js`). Der Cursor bleibt im Anker (erste Zelle); jede Änderung (Löschen, Verschieben, Rahmen …) wirkt auf die Zellen des Rechtecks. |
+| **Stift** (`T.pen`) | Aktuelle Linienart, -stärke und -farbe für Tabellenrahmen. |

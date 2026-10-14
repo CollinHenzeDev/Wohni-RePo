@@ -295,6 +295,84 @@
     });
   };
 
+  /* ---- Tabelleneigenschaften: Größe, Zeile/Spalte, Innenabstand, Rahmen ---- */
+  D.tableProps = function () {
+    const T = W.tables;
+    const table = T.currentTable();
+    if (!table) { W.toast('Setze den Cursor zuerst in eine Tabelle.'); return; }
+    const cells = T.selectedCells();                       // Auswahl merken (der Dialog nimmt den Fokus)
+    const mt = T.metrics(table);
+    // Zeilen-/Spaltenwerte der ersten gewählten Zelle
+    const c0 = cells[0] || table.querySelector('td,th');
+    const piece = c0.closest('table');
+    const pos = T.grid(piece).g.flat().find((x) => x && x.cell === c0 && x.origin);
+    const rowH = c0.parentElement.getBoundingClientRect().height / W.view.zoom;
+    const colW = c0.getBoundingClientRect().width / W.view.zoom;
+    const cs = getComputedStyle(c0);
+    const au = parseFloat(table.style.getPropertyValue('--tw')) || 1;
+
+    let unit = 'cm';
+    const wIn = F.num(cm(mt.width), { w: 80, step: 0.1, min: 0.5 });
+    const wUnit = F.select([['cm', 'cm'], ['%', '% der Textbreite']], 'cm', { w: 150 });
+    wUnit.addEventListener('change', () => {
+      const v = parseFloat(wIn.value) || 0;
+      if (unit === 'cm' && wUnit.value === '%') wIn.value = Math.round(u.cm2px(v) / mt.avail * 100);
+      else if (unit === '%' && wUnit.value === 'cm') wIn.value = cm(v / 100 * mt.avail);
+      unit = wUnit.value;
+    });
+    const hIn = F.num(0, { w: 80, step: 0.1, min: 0 });
+    const align = F.select([['left', 'Links'], ['center', 'Zentriert'], ['right', 'Rechts']], table.style.marginLeft === 'auto' ? (table.style.marginRight === 'auto' ? 'center' : 'right') : 'left', { w: 150 });
+    const rIn = F.num(cm(rowH), { w: 80, step: 0.1, min: 0 });
+    const cIn = F.num(cm(colW), { w: 80, step: 0.1, min: 0.3 });
+    const padLR = F.num(cm(parseFloat(cs.paddingLeft) || 0), { w: 80, step: 0.05, min: 0 });
+    const padTB = F.num(cm(parseFloat(cs.paddingTop) || 0), { w: 80, step: 0.05, min: 0 });
+    const allCells = T.pieces(table).flatMap((p) => Array.from(p.querySelectorAll('td,th')).filter((c) => c.closest('table') === p));
+    const scope = F.select([['table', 'Ganze Tabelle'], ['sel', 'Markierte Zellen']], cells.length > 1 ? 'sel' : 'table', { w: 170 });
+    const targets = () => (scope.value === 'sel' ? (cells.length ? cells : [c0]) : allCells);
+    const doBorder = F.check('Rahmenlinien anwenden', false);
+    const where = F.select([['all', 'Alle Rahmenlinien'], ['outside', 'Außenrahmen'], ['inside', 'Innenrahmen'], ['top', 'Nur oben'], ['bottom', 'Nur unten'], ['left', 'Nur links'], ['right', 'Nur rechts'], ['none', 'Kein Rahmen']], 'all', { w: 170 });
+    const style = F.select(T.PEN_STYLES, T.pen.style, { w: 170 });
+    const wsel = F.select(T.PEN_WIDTHS.map((pt) => [pt, String(pt).replace('.', ',') + ' pt']), T.PEN_WIDTHS.find((pt) => Math.abs(pt * 96 / 72 - T.pen.width) < 0.2) || 0.75, { w: 170 });
+    const col = F.color(T.pen.color);
+    const sec = (title, ...rows) => h('fieldset.tpsec', h('legend', title), ...rows);
+    ui.dialog({
+      title: 'Tabelleneigenschaften', width: 520,
+      body: h('div', 
+        sec('Tabelle', F.row('Breite:', wIn, wUnit), F.row('Höhe insgesamt (cm):', hIn, h('span.muted', ' aktuell ' + cm(mt.height).toString().replace('.', ',') + ' · 0 = automatisch')), F.row('Ausrichtung:', align)),
+        sec('Aktuelle Zeile und Spalte', F.row('Zeilenhöhe (cm):', rIn, h('span.muted', ' mindestens · 0 = automatisch')), F.row('Spaltenbreite (cm):', cIn)),
+        sec('Zellen', F.row('Gilt für:', scope), F.row('Innenabstand links/rechts (cm):', padLR), F.row('Innenabstand oben/unten (cm):', padTB)),
+        sec('Rahmen', doBorder.el, F.row('Anwenden auf:', where), F.row('Linienart:', style), F.row('Linienstärke:', wsel), F.row('Farbe:', col)),
+      ),
+      buttons: [{ label: 'Abbrechen' }, { label: 'OK', primary: true, onClick: () => {
+        setTimeout(() => {
+          W.fmt.refocus();
+          const tw = parseFloat(wIn.value);
+          if (tw) {
+            const px = wUnit.value === '%' ? tw / 100 * mt.avail : u.cm2px(tw);
+            if (Math.abs(px - mt.width) > 1) T.setWidth(px);
+          }
+          const hv = parseFloat(hIn.value);
+          if (hv > 0) T.setHeight(u.cm2px(hv));
+          if (align.value !== (table.style.marginLeft === 'auto' ? (table.style.marginRight === 'auto' ? 'center' : 'right') : 'left')) T.alignTable(align.value);
+          const rv = parseFloat(rIn.value);
+          if (Math.abs(u.cm2px(rv || 0) - (rv ? rowH : 0)) > 1 || (!rv && c0.parentElement.style.height)) T.setRowHeight(rv > 0 ? u.cm2px(rv) : 0, cells.length ? cells : [c0]);
+          const cv = parseFloat(cIn.value);
+          if (cv && Math.abs(u.cm2px(cv) - colW) > 1) T.setColumnWidth(u.cm2px(cv), pos ? pos.c0 : null, cells.length ? cells : [c0]);
+          const pl = parseFloat(padLR.value), pt = parseFloat(padTB.value);
+          if (Math.abs(u.cm2px(pl) - (parseFloat(cs.paddingLeft) || 0)) > 0.5 || Math.abs(u.cm2px(pt) - (parseFloat(cs.paddingTop) || 0)) > 0.5) {
+            T.setCellPadding({ left: u.cm2px(pl || 0), right: u.cm2px(pl || 0), top: u.cm2px(pt || 0), bottom: u.cm2px(pt || 0) }, targets());
+          }
+          if (doBorder.input.checked) {
+            const wpt = parseFloat(wsel.value);
+            T.setPen({ style: style.value, width: wpt * 96 / 72, color: col.value });
+            T.setBorders(where.value, col.value, wpt * 96 / 72, style.value, targets());
+          }
+        }, 0);
+      } }],
+      refocus: false,
+    });
+  };
+
   /* ---- Seite einrichten ---- */
   D.pageSetup = function () {
     const p = W.doc.page;
