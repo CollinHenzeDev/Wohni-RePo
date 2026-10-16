@@ -64,14 +64,39 @@ export class Rooms {
     return { ok: true, value: { room, member } };
   }
 
+  /** Verlassen geht auch mitten im Spiel: Das Spiel entscheidet, was das für den Spielstand heißt. */
   leave(room: Room, memberId: string): Result<Room> {
-    if (room.game) return { ok: false, error: "Während eines Spiels kannst du den Raum nicht verlassen." };
+    if (room.game) {
+      room.game.state = games[room.game.id].leave(room.game.state, memberId);
+    }
     room.members = room.members.filter((m) => m.id !== memberId);
     if (room.members.length === 0) {
       this.rooms.delete(room.code);
     } else if (room.hostId === memberId) {
-      room.hostId = room.members[0].id;
+      room.hostId = (room.members.find((m) => m.connected) ?? room.members[0]).id;
     }
+    return { ok: true, value: room };
+  }
+
+  /** Der Gastgeber entfernt einen Spieler aus der Lobby. */
+  kick(room: Room, hostId: string, targetId: string): Result<Member> {
+    if (room.hostId !== hostId) return { ok: false, error: "Nur der Gastgeber kann Spieler entfernen." };
+    if (room.game) return { ok: false, error: "Während eines Spiels kann niemand entfernt werden." };
+    if (targetId === hostId) return { ok: false, error: "Du kannst dich nicht selbst entfernen." };
+    const target = room.members.find((m) => m.id === targetId);
+    if (!target) return { ok: false, error: "Spieler nicht gefunden." };
+    room.members = room.members.filter((m) => m.id !== targetId);
+    return { ok: true, value: target };
+  }
+
+  /** Der Gastgeber übergibt seine Rolle in der Lobby. */
+  makeHost(room: Room, hostId: string, targetId: string): Result<Room> {
+    if (room.hostId !== hostId) return { ok: false, error: "Nur der Gastgeber kann die Rolle übergeben." };
+    if (room.game) return { ok: false, error: "Während eines Spiels bleibt der Gastgeber fest." };
+    if (targetId === hostId || !room.members.some((m) => m.id === targetId)) {
+      return { ok: false, error: "Spieler nicht gefunden." };
+    }
+    room.hostId = targetId;
     return { ok: true, value: room };
   }
 
@@ -122,4 +147,6 @@ function newMember(name: string): Member {
 }
 
 export const gameList = () =>
-  Object.values(games).map(({ id, name, minPlayers, maxPlayers }) => ({ id, name, minPlayers, maxPlayers }));
+  Object.values(games).map(({ id, name, description, icon, minPlayers, maxPlayers }) => ({
+    id, name, description, icon, minPlayers, maxPlayers,
+  }));

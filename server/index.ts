@@ -89,6 +89,8 @@ wss.on("connection", (ws) => {
       }
     }
 
+    // Wer entfernt wurde, ist für diese Verbindung nicht mehr im Raum.
+    if (room && memberId && !room.members.some((m) => m.id === memberId)) room = memberId = undefined;
     if (!room || !memberId) return fail("Du bist in keinem Raum.");
     const r = room;
     const id = memberId;
@@ -104,11 +106,21 @@ wss.on("connection", (ws) => {
       case "leave": {
         const res = rooms.leave(r, id);
         if (!res.ok) return fail(res.error);
-        sockets.get(id)?.delete(ws);
+        for (const s of sockets.get(id) ?? []) send(s, { t: "left" });
+        sockets.delete(id);
         room = memberId = undefined;
-        send(ws, { t: "left" });
         return broadcast(r);
       }
+      case "kick": {
+        const targetId = String(msg.memberId);
+        const res = rooms.kick(r, id, targetId);
+        if (!res.ok) return fail(res.error);
+        for (const s of sockets.get(targetId) ?? []) send(s, { t: "left", reason: "kicked" });
+        sockets.delete(targetId);
+        return broadcast(r);
+      }
+      case "makeHost":
+        return done(rooms.makeHost(r, id, String(msg.memberId)));
     }
   });
 

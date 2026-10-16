@@ -135,11 +135,15 @@ export function roundChanges(players: Player[]): RoundChange[] {
   return changes;
 }
 
+/** Der nächste Spieler, der in dieser Runde noch nicht dran war, sonst ist die Runde vorbei. */
 function endTurn(state: State): State {
-  const next = nextAliveIndex(state.players, state.currentIndex);
-  if (next !== state.starterIndex) {
-    const players = state.players.map((p, i) => (i === next ? { ...p, status: "playing" as const } : p));
-    return { ...state, players, currentIndex: next };
+  const n = state.players.length;
+  for (let step = 1; step <= n; step++) {
+    const i = (state.currentIndex + step) % n;
+    if (state.players[i].status === "waiting") {
+      const players = state.players.map((p, j) => (j === i ? { ...p, status: "playing" as const } : p));
+      return { ...state, players, currentIndex: i };
+    }
   }
   return finishRound(state);
 }
@@ -224,12 +228,38 @@ export function apply(
   return { ok: false, error: "Unbekannte Aktion." };
 }
 
+/**
+ * Wer das Spiel verlässt, scheidet sofort aus (wie bei 0 Leben) und zählt in dieser Runde nicht mehr mit.
+ * Bleibt nur einer übrig, gewinnt er auf der Stelle.
+ */
+export function leave(state: State, playerId: string): State {
+  const idx = state.players.findIndex((p) => p.id === playerId);
+  if (idx < 0 || state.players[idx].lives <= 0 || state.phase === "gameOver") return state;
+
+  const players = state.players.map((p, i) => (i === idx ? { ...p, lives: 0, status: "out" as const } : p));
+  const survivors = players.filter((p) => p.lives > 0);
+  if (survivors.length <= 1) {
+    return { ...state, players, currentIndex: -1, phase: "gameOver", winnerId: survivors[0]?.id ?? null };
+  }
+  const next = { ...state, players };
+  return state.phase === "turn" && idx === state.currentIndex ? endTurn(next) : next;
+}
+
 export const diceBlackjack: Game<State, Action> = {
   id: "dice-blackjack",
   name: "Würfel-Blackjack",
+  description: "Komm mit deinen Würfeln möglichst nah an die 21 – aber nicht drüber.",
+  icon: "🎲",
   minPlayers: 2,
   maxPlayers: 10,
   setup,
   apply,
-  view: (state) => ({ ...state, target: TARGET, maxDice: MAX_DICE, maxRolls: MAX_ROLLS }),
+  leave,
+  view: (state) => ({
+    ...state,
+    players: state.players.map((p) => ({ ...p, swimmer: isSwimmer(p) })),
+    target: TARGET,
+    maxDice: MAX_DICE,
+    maxRolls: MAX_ROLLS,
+  }),
 };

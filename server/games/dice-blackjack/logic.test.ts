@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { apply, setup, type Action, type State } from "./logic.ts";
+import { apply, diceBlackjack, leave, setup, type Action, type State } from "./logic.ts";
 import type { ActionContext, Rng } from "../types.ts";
 
 /** RNG, der nacheinander die gegebenen Würfelaugen liefert. */
@@ -237,4 +237,84 @@ test("Würden alle Übrigen ausscheiden, zählt die Runde nicht", () => {
   assert.equal(s.lastResult?.voided, true);
   assert.deepEqual(s.players.map((p) => p.lives), [1, 1]);
   assert.equal(s.phase, "roundOver");
+});
+
+// --- Schwimmer-Markierung ---
+
+test("Die Ansicht markiert genau Spieler mit 1 Leben als Schwimmer", () => {
+  const base = newGame(4);
+  const s: State = {
+    ...base,
+    players: base.players.map((p, i) => ({ ...p, lives: [1, 2, 0, 4][i] })),
+  };
+  const view = diceBlackjack.view(s, "anna") as { players: { id: string; swimmer: boolean }[] };
+  assert.deepEqual(view.players.map((p) => p.swimmer), [true, false, false, false]);
+});
+
+// --- Spiel verlassen ---
+
+test("Wer am Zug das Spiel verlässt, scheidet aus und der Nächste ist dran", () => {
+  let s = newGame(3);
+  s = leave(s, "anna");
+  assert.equal(player(s, "anna").lives, 0);
+  assert.equal(player(s, "anna").status, "out");
+  assert.equal(s.players[s.currentIndex].id, "ben");
+  assert.equal(player(s, "ben").status, "playing");
+});
+
+test("Wer wartet und geht, wird übersprungen und die Runde endet normal", () => {
+  let s = newGame(3);
+  s = leave(s, "ben");
+  s = act(s, "anna", { type: "roll", dice: 1 }, dice(2));
+  s = act(s, "anna", { type: "stand" });
+  assert.equal(s.players[s.currentIndex].id, "carl");
+  s = act(s, "carl", { type: "roll", dice: 1 }, dice(6));
+  s = act(s, "carl", { type: "stand" });
+  assert.equal(s.phase, "roundOver");
+  assert.deepEqual(s.lastResult?.changes, [{ playerId: "anna", delta: -1, reason: "lowest" }]);
+});
+
+test("Geht der Startspieler mitten in der Runde, endet die Runde trotzdem", () => {
+  let s = newGame(3);
+  s = act(s, "anna", { type: "roll", dice: 1 }, dice(1));
+  s = act(s, "anna", { type: "stand" });
+  s = leave(s, "anna");
+  s = act(s, "ben", { type: "roll", dice: 1 }, dice(3));
+  s = act(s, "ben", { type: "stand" });
+  s = act(s, "carl", { type: "roll", dice: 1 }, dice(5));
+  s = act(s, "carl", { type: "stand" });
+  assert.equal(s.phase, "roundOver");
+  // Annas Wurf zählt nicht mehr: Ben hat die niedrigste Summe.
+  assert.deepEqual(s.lastResult?.changes, [{ playerId: "ben", delta: -1, reason: "lowest" }]);
+  assert.equal(player(s, "anna").lives, 0);
+});
+
+test("Bleibt nach dem Verlassen nur einer übrig, gewinnt er sofort", () => {
+  let s = newGame(2);
+  s = leave(s, "ben");
+  assert.equal(s.phase, "gameOver");
+  assert.equal(s.winnerId, "anna");
+});
+
+test("Nach dem Verlassen in der Rundenpause startet die nächste Runde ohne den Gegangenen", () => {
+  let s = newGame(3);
+  s = playRound(s, "ben");
+  assert.equal(s.phase, "roundOver");
+  s = leave(s, "carl");
+  assert.equal(s.phase, "roundOver");
+  s = act(s, "anna", { type: "nextRound" });
+  assert.equal(s.phase, "turn");
+  assert.notEqual(s.players[s.currentIndex].id, "carl");
+  assert.equal(player(s, "carl").status, "out");
+});
+
+test("Wer schon ausgeschieden ist oder nach Spielende geht, ändert nichts", () => {
+  let s = newGame(3);
+  for (let i = 0; i < 4; i++) s = playRound(s, "ben");
+  const before = s;
+  assert.equal(leave(before, "ben"), before);
+  assert.equal(leave(before, "unbekannt"), before);
+  let over = newGame(2);
+  over = leave(over, "ben");
+  assert.equal(leave(over, "anna"), over);
 });
