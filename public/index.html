@@ -10,9 +10,13 @@
 <body>
   <header>
     <h1>Wohni-Spiele</h1>
-    <span id="conn" class="conn" title="Verbindung"></span>
+    <div class="header-right">
+      <span id="conn" class="conn" title="Verbindung"></span>
+      <button id="menu-btn" class="icon-btn" aria-label="Menü" hidden>☰</button>
+    </div>
   </header>
   <main id="app"></main>
+  <div id="overlay" class="overlay" hidden></div>
   <div id="toast" class="toast" hidden></div>
   <script type="module" src="app.js"></script>
 </body>

@@ -1,3 +1,5 @@
+import { audio } from "../audio.js";
+
 const PIPS = {
   1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
 };
@@ -8,13 +10,14 @@ const MAX_HEARTS = 3;
 const revealed = new Set(); // Würfe, deren Becher schon "geöffnet" wurde
 const pendingTimers = new Map(); // laufende Becher-Timer, damit nicht doppelt geplant wird
 const flipped = new Set(); // Würfe, deren Aufdeck-Animation schon einmal lief
+const announced = new Set(); // Rundenenden/Spielenden, für die der Ton schon lief
 // Wessen Würfelbecher gerade im Aktionsbereich zu sehen ist. Bleibt auf dem Spieler stehen,
 // der zuletzt gewürfelt hat, bis dessen letzter Wurf fertig aufgedeckt ist – erst danach
 // springt die Anzeige zum nächsten Spieler weiter.
 let shownId = null;
 
 function die(h, value, { big = false, fresh = false } = {}) {
-  return h("div", { class: `die${big ? " big" : ""}${fresh ? " new" : ""}`, "aria-label": String(value) },
+  return h("div", { class: `die${big ? " big" : ""}${fresh ? " new" : ""}`, "data-v": value, "aria-label": String(value) },
     Array.from({ length: 9 }, (_, i) => h("span", { class: `pip${PIPS[value].includes(i) ? " on" : ""}` })));
 }
 
@@ -45,9 +48,11 @@ function scheduleReveals(roomCode, round, player, rerender) {
       return;
     }
     if (!pendingTimers.has(key)) {
+      audio.play("rattle", ANIM_MS);
       pendingTimers.set(key, setTimeout(() => {
         revealed.add(key);
         pendingTimers.delete(key);
+        audio.play("land");
         rerender();
       }, ANIM_MS));
     }
@@ -62,7 +67,7 @@ function diceRow(h, roomCode, round, player, maxRolls) {
       flipped.add(key);
       return h("div", { class: "throw" }, throwDice.map((v) => die(h, v, { big: true, fresh })));
     }
-    return h("div", { class: "cup shaking" }, h("div", { class: "cup-hand" }, "🖐️"), h("div", { class: "cup-body" }));
+    return h("div", { class: "cup shaking" }, h("div", { class: "cup-knob" }), h("div", { class: "cup-body" }), h("div", { class: "cup-rim" }));
   });
   const lastKey = lastThrowKey(roomCode, round, player);
   const isRolling = lastKey !== null && !revealed.has(lastKey);
@@ -72,10 +77,11 @@ function diceRow(h, roomCode, round, player, maxRolls) {
   return { row: h("div", { class: "dice-row" }, items), isRolling };
 }
 
+/** Position auf der Ellipse des Rings; der Ring ist per CSS so eingerückt, dass kein Männchen angeschnitten wird. */
 function figurePosition(i, n) {
   const angle = (-90 + (360 * i) / n) * (Math.PI / 180);
-  const x = 50 + 42 * Math.cos(angle);
-  const y = 50 + 38 * Math.sin(angle);
+  const x = 50 + 50 * Math.cos(angle);
+  const y = 50 + 50 * Math.sin(angle);
   return `left:${x}%; top:${y}%`;
 }
 
@@ -85,6 +91,7 @@ function figure(h, p, i, n, { me, isCurrent }) {
     h("div", { class: `figure-body${isCurrent ? " figure-current" : ""}` },
       h("div", { class: "figure-head" }), h("div", { class: "figure-torso" })),
     h("div", { class: `fig-name${p.lives <= 0 ? " figure-out" : ""}` }, p.name + (p.id === me ? " (du)" : "")),
+    p.swimmer ? h("div", { class: "fig-swim" }, "Schwimmer") : null,
   );
   el.setAttribute("style", figurePosition(i, n));
   return el;
@@ -111,9 +118,20 @@ export function renderDiceBlackjack({ room, me, send, h, isHost, rerender }) {
   }
 
   const table = h("div", { class: "bj-table" },
-    h("div", { class: "bj-table-oval" }),
-    ...s.players.map((p, i) => figure(h, p, i, s.players.length, { me, isCurrent: p === current && s.phase === "turn" })),
+    h("div", { class: "bj-ring" },
+      h("div", { class: "bj-table-oval" }),
+      ...s.players.map((p, i) => figure(h, p, i, s.players.length, { me, isCurrent: p === current && s.phase === "turn" })),
+    ),
   );
+
+  // Ergebnis-Töne einmal pro Rundenende, nachdem der letzte Becher aufgedeckt ist.
+  const announceKey = `${room.code}-${s.round}-${s.phase}`;
+  if ((s.phase === "roundOver" || s.phase === "gameOver") && !announced.has(announceKey)) {
+    announced.add(announceKey);
+    const mine = s.lastResult?.changes.find((c) => c.playerId === me);
+    const sound = s.phase === "gameOver" ? "fanfare" : mine ? (mine.delta < 0 ? "lifeLost" : "lifeGained") : null;
+    if (sound) setTimeout(() => audio.play(sound), ANIM_MS);
+  }
 
   let actionContent;
   if (s.phase === "turn" && shownPlayer) {

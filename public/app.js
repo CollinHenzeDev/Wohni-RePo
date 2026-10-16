@@ -1,8 +1,11 @@
 import { renderDiceBlackjack } from "./games/dice-blackjack.js";
+import { audio } from "./audio.js";
 
 const app = document.getElementById("app");
 const conn = document.getElementById("conn");
 const toastEl = document.getElementById("toast");
+const menuBtn = document.getElementById("menu-btn");
+const overlay = document.getElementById("overlay");
 const SESSION_KEY = "wohni-session";
 
 const store = {
@@ -16,6 +19,7 @@ let games = [];
 let room = null;
 let me = null;
 let retry = 0;
+let selectedGameId = null;
 
 const gameRenderers = { "dice-blackjack": renderDiceBlackjack };
 
@@ -56,7 +60,9 @@ function handle(msg) {
     case "left":
       store.clear();
       room = me = null;
+      closeMenu();
       render();
+      if (msg.reason === "kicked") toast("Du wurdest aus dem Raum entfernt.");
       break;
     case "error":
       toast(msg.error);
@@ -83,6 +89,8 @@ export function h(tag, attrs = {}, ...children) {
 }
 
 function render() {
+  menuBtn.hidden = !room?.game;
+  if (menuBtn.hidden) closeMenu();
   if (!room) return app.replaceChildren(homeView());
   if (!room.game) return app.replaceChildren(lobbyView());
   const renderer = gameRenderers[room.game.id];
@@ -122,8 +130,35 @@ function homeView() {
 function lobbyView() {
   const isHost = room.hostId === me;
   const link = `${location.origin}/?raum=${room.code}`;
-  const select = h("select", { hidden: games.length < 2 },
-    games.map((g) => h("option", { value: g.id }, g.name)));
+  if (!games.some((g) => g.id === selectedGameId)) selectedGameId = games[0]?.id ?? null;
+
+  const memberRow = (m) => h("li", {},
+    h("span", {}, m.name, m.id === me ? " (du)" : ""),
+    h("span", { class: "member-actions" },
+      m.id === room.hostId ? h("span", { class: "tag" }, "Gastgeber") : null,
+      !m.connected ? h("span", { class: "tag out" }, "getrennt") : null,
+      isHost && m.id !== me
+        ? [
+            h("button", { class: "mini", title: "Zum Gastgeber machen", "aria-label": `${m.name} zum Gastgeber machen`,
+              onclick: () => confirm(`${m.name} zum Gastgeber machen? Du kannst dann nicht mehr starten.`) && send({ t: "makeHost", memberId: m.id }) }, "👑"),
+            h("button", { class: "mini danger", title: "Entfernen", "aria-label": `${m.name} entfernen`,
+              onclick: () => confirm(`${m.name} aus dem Raum entfernen?`) && send({ t: "kick", memberId: m.id }) }, "✕"),
+          ]
+        : null),
+  );
+
+  const tile = (g) => h("button", {
+    class: `tile${g.id === selectedGameId ? " selected" : ""}`,
+    "aria-pressed": String(g.id === selectedGameId),
+    disabled: !isHost,
+    onclick: () => { selectedGameId = g.id; render(); },
+  },
+    h("span", { class: "tile-icon" }, g.icon),
+    h("span", { class: "tile-name" }, g.name),
+    h("span", { class: "tile-desc" }, g.description),
+    h("span", { class: "tile-meta" }, `${g.minPlayers}–${g.maxPlayers} Spieler`),
+  );
+
   return h("div", {},
     h("div", { class: "card" },
       h("p", { class: "muted", style: "text-align:center;margin:0" }, "Raum-Code"),
@@ -132,24 +167,55 @@ function lobbyView() {
     ),
     h("div", { class: "card" },
       h("h2", {}, `Spieler (${room.members.length})`),
-      h("ul", { class: "plain" }, room.members.map((m) =>
-        h("li", {},
-          h("span", {}, m.name, m.id === me ? " (du)" : ""),
-          h("span", {},
-            m.id === room.hostId ? h("span", { class: "tag" }, "Gastgeber") : null,
-            !m.connected ? h("span", { class: "tag out" }, "getrennt") : null),
-        ))),
+      h("ul", { class: "plain" }, room.members.map(memberRow)),
     ),
     h("div", { class: "card stack" },
-      h("h2", {}, games.length > 1 ? "Spiel wählen" : games[0]?.name ?? "Spiel"),
-      select,
+      h("h2", {}, "Spiel wählen"),
+      h("div", { class: "tiles" }, games.map(tile)),
       isHost
-        ? h("button", { onclick: () => send({ t: "start", gameId: select.value || games[0].id }) }, "Spiel starten")
+        ? h("button", { onclick: () => send({ t: "start", gameId: selectedGameId }) }, "Spiel starten")
         : h("p", { class: "muted" }, "Warte auf den Gastgeber …"),
       h("button", { class: "danger", onclick: () => send({ t: "leave" }) }, "Raum verlassen"),
     ),
   );
 }
+
+// --- Menü im Spiel: Ton, Musik, Lautstärke, Spiel verlassen ---
+
+function closeMenu() {
+  overlay.hidden = true;
+  overlay.replaceChildren();
+}
+
+function openMenu() {
+  const cfg = audio.get();
+  const volume = h("input", { type: "range", min: 0, max: 100, value: Math.round(cfg.volume * 100), "aria-label": "Lautstärke",
+    oninput: () => audio.set({ volume: Number(volume.value) / 100 }) });
+  const toggle = (label, key) => {
+    const box = h("input", { type: "checkbox", class: "switch", checked: cfg[key], id: `opt-${key}`,
+      onchange: () => audio.set({ [key]: box.checked }) });
+    return h("div", { class: "menu-row" }, h("label", { for: `opt-${key}` }, label), box);
+  };
+  const isHost = room?.hostId === me;
+  const leaveWarning = isHost
+    ? "Spiel verlassen? Du scheidest aus, und die Gastgeber-Rolle geht an jemand anderen."
+    : "Spiel verlassen? Du scheidest aus und kannst nicht wieder einsteigen.";
+
+  overlay.replaceChildren(h("div", { class: "sheet", role: "dialog", "aria-label": "Menü" },
+    h("div", { class: "sheet-head" }, h("h2", {}, "Menü"),
+      h("button", { class: "icon-btn", "aria-label": "Schließen", onclick: closeMenu }, "✕")),
+    h("div", { class: "card stack" },
+      toggle("Töne", "sfx"),
+      toggle("Musik", "music"),
+      h("div", { class: "menu-row vol" }, h("label", {}, "Lautstärke"), volume),
+    ),
+    h("button", { class: "danger", onclick: () => confirm(leaveWarning) && send({ t: "leave" }) }, "Spiel verlassen"),
+  ));
+  overlay.hidden = false;
+}
+
+menuBtn.addEventListener("click", openMenu);
+overlay.addEventListener("click", (e) => { if (e.target === overlay) closeMenu(); });
 
 render();
 connect();

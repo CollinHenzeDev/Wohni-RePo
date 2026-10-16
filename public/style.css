@@ -56,23 +56,36 @@ ul.plain li:last-child { border-bottom: 0; }
 
 /* Würfel-Blackjack */
 .die {
-  width: 30px; height: 30px; background: #fafaf9; border-radius: 6px; padding: 4px;
+  width: 30px; height: 30px; padding: 4px; border-radius: 24%;
+  background: linear-gradient(145deg, #fffefb, #e4dfd3);
+  box-shadow: inset 0 -2px 3px #0000002e, inset 0 1.5px 1px #ffffffcc, 0 3px 5px #00000066;
   display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr);
 }
-.die.big { width: 52px; height: 52px; border-radius: 10px; padding: 7px; }
-.die.new { animation: roll .45s ease-out; }
-.pip { width: 100%; height: 100%; border-radius: 50%; }
-.pip.on { background: #1c1917; }
-@keyframes roll { 0% { transform: rotate(-200deg) scale(.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.die.big { width: 52px; height: 52px; padding: 7px; }
+.die.new { animation: tumble .6s cubic-bezier(.2, .7, .3, 1); }
+.pip { width: 78%; height: 78%; margin: auto; border-radius: 50%; }
+.pip.on {
+  background: radial-gradient(circle at 35% 30%, #57534e, #0c0a09 70%);
+  box-shadow: inset 0 1px 2px #000000b0, 0 1px 0 #ffffffaa;
+}
+.die[data-v="1"] .pip.on { background: radial-gradient(circle at 35% 30%, #f87171, #b91c1c 70%); transform: scale(1.35); }
+@keyframes tumble {
+  0% { transform: translateY(-46px) rotate(-260deg) scale(.55); opacity: 0; }
+  55% { transform: translateY(5px) rotate(14deg) scale(1.06); opacity: 1; }
+  75% { transform: translateY(-7px) rotate(-5deg); }
+  100% { transform: none; }
+}
 .banner { text-align: center; padding: 8px 0 16px; }
 .banner .big { font-size: 1.3rem; font-weight: 800; }
 
 /* Tisch: die obere Hälfte mit den Spieler-Männchen rund um eine Tischplatte */
 .bj { display: flex; flex-direction: column; gap: 0; margin: 0 -16px; min-height: calc(100dvh - 150px); }
-.bj-table { position: relative; flex: 1 1 240px; min-height: 220px; overflow: hidden; }
+.bj-table { position: relative; flex: 1 1 240px; min-height: 280px; overflow: hidden; }
+/* Der Ring ist um die halbe Männchengröße eingerückt, damit die Männchen am Rand nicht abgeschnitten werden. */
+.bj-ring { position: absolute; inset: 58px 44px; }
 .bj-table-oval {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: 76%; height: 60%; border-radius: 50%;
+  width: 84%; height: 74%; border-radius: 50%;
   background: radial-gradient(ellipse at center, #1d5c36, #123a22 75%);
   border: 6px solid #0c2416; box-shadow: inset 0 0 30px #00000055;
 }
@@ -83,6 +96,7 @@ ul.plain li:last-child { border-bottom: 0; }
 .figure-head { width: 20px; height: 20px; border-radius: 50%; background: #e8dcc8; margin: 0 auto; }
 .figure-torso { width: 28px; height: 32px; border-radius: 10px 10px 6px 6px; background: #e8dcc8; margin: -2px auto 0; }
 .fig-name { font-size: .7rem; margin-top: 2px; color: var(--muted); white-space: nowrap; max-width: 76px; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+.fig-swim { font-size: .62rem; font-weight: 700; letter-spacing: .02em; color: #60a5fa; margin-top: 1px; text-shadow: 0 1px 2px #000; }
 .figure-out { opacity: .4; filter: grayscale(1); }
 .figure-out .fig-name::after { content: " · raus"; }
 
@@ -93,21 +107,80 @@ ul.plain li:last-child { border-bottom: 0; }
 .stat-corner .big-num { font-size: 1.5rem; font-weight: 800; }
 .stat-corner .sub { font-size: .7rem; color: var(--muted); }
 .turn-note { text-align: center; color: var(--muted); margin: 0 0 8px; }
-.dice-row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 52px; margin: 4px 0 14px; }
-.die-slot-empty { width: 30px; height: 30px; border: 2px dashed #3a6349; border-radius: 6px; opacity: .6; }
-.cup { position: relative; width: 64px; height: 50px; }
+.dice-row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 64px; margin: 4px 0 14px; }
+.throw { display: flex; flex-direction: column; gap: 5px; }
+.die-slot-empty { width: 32px; height: 32px; border: 2px dashed #3a6349; border-radius: 8px; opacity: .6; }
+/* Der Becher wird kopfüber geschüttelt: breite Öffnung unten, Griff oben. */
+.cup { position: relative; width: 62px; height: 66px; margin: 0 6px; transform-origin: 50% 100%; filter: drop-shadow(0 4px 4px #00000066); }
 .cup-body {
-  position: absolute; inset: 0; border-radius: 6px 6px 22px 22px;
-  background: linear-gradient(#8a5a34, #5c341a); box-shadow: inset 0 -6px 10px #00000044;
+  position: absolute; left: 0; right: 0; top: 8px; bottom: 8px;
+  clip-path: polygon(16% 0, 84% 0, 100% 100%, 0 100%);
+  background:
+    linear-gradient(90deg, #00000055 0%, transparent 25%, #ffffff26 45%, transparent 62%, #00000066 100%),
+    repeating-linear-gradient(0deg, #00000014 0 3px, transparent 3px 6px),
+    linear-gradient(#a8703f, #6b3f1d);
 }
-.cup-hand { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 2rem; }
-.cup.shaking { animation: cupshake .5s ease-in-out infinite; }
+.cup-rim {
+  position: absolute; left: -3px; right: -3px; bottom: 2px; height: 12px; border-radius: 6px;
+  background: linear-gradient(#3b2410, #24140a); box-shadow: inset 0 1px 0 #ffffff25;
+}
+.cup-knob {
+  position: absolute; left: 50%; top: 0; width: 18px; height: 10px; transform: translateX(-50%);
+  border-radius: 8px 8px 2px 2px; background: linear-gradient(#c28a55, #7a4a22);
+}
+.cup.shaking { animation: cupshake .45s ease-in-out infinite; }
 @keyframes cupshake {
-  0%, 100% { transform: rotate(0deg) translateX(0); }
-  25% { transform: rotate(-10deg) translateX(-3px); }
-  75% { transform: rotate(10deg) translateX(3px); }
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-4px, -5px) rotate(-9deg); }
+  40% { transform: translate(3px, 2px) rotate(7deg); }
+  60% { transform: translate(-3px, -4px) rotate(-6deg); }
+  80% { transform: translate(4px, 1px) rotate(8deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cup.shaking, .die.new { animation: none; }
 }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
   background: #7f1d1d; color: #fff; padding: 10px 16px; border-radius: 10px; max-width: 90vw;
 }
+
+.header-right { display: flex; align-items: center; gap: 12px; }
+button.icon-btn { width: 40px; height: 40px; padding: 0; border-radius: 10px; background: #2f5a41; color: var(--text); font-size: 1.2rem; line-height: 1; }
+
+/* Menü im Spiel */
+.overlay { position: fixed; inset: 0; z-index: 10; background: #000000aa; display: flex; align-items: flex-end; justify-content: center; }
+.overlay[hidden] { display: none; }
+.sheet { width: 100%; max-width: 640px; background: var(--bg); border-radius: 20px 20px 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sheet-head h2 { margin: 0; }
+.menu-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.menu-row label { margin: 0; font-size: 1rem; color: var(--text); }
+.menu-row.vol input { flex: 1; max-width: 60%; margin: 0; padding: 0; border: 0; background: transparent; accent-color: var(--accent); }
+input.switch {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 50px; height: 30px;
+  margin: 0; padding: 0; border: 0; border-radius: 999px; background: #3f3f46; cursor: pointer; transition: background .15s;
+}
+input.switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; transition: transform .15s;
+}
+input.switch:checked { background: var(--ok); }
+input.switch:checked::after { transform: translateX(20px); }
+
+/* Spielauswahl */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+button.tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; text-align: left;
+  background: #14532d; color: var(--text); border: 2px solid transparent; font-weight: 400;
+}
+button.tile.selected { border-color: var(--accent); background: #1d6b3b; }
+button.tile:disabled { opacity: 1; cursor: default; }
+.tile-icon { font-size: 2rem; line-height: 1; }
+.tile-name { font-weight: 700; font-size: 1rem; }
+.tile-desc { font-size: .8rem; color: var(--muted); }
+.tile-meta { font-size: .72rem; color: var(--accent); margin-top: 2px; }
+
+/* Spieler-Verwaltung */
+.member-actions { display: flex; align-items: center; gap: 6px; }
+button.mini { width: auto; padding: 4px 10px; font-size: .9rem; border-radius: 8px; background: #2f5a41; color: var(--text); }
+button.mini.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
