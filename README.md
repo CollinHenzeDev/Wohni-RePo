@@ -66,5 +66,4 @@ npm run typecheck
   Wer als Letzter übrig bleibt, gewinnt.
 - Jede Runde beginnt der nächste Spieler. Nur der **Gastgeber** (wer den Raum eröffnet hat)
   kann die nächste Runde starten.
-- *Offen:* Sonderregeln für den Schwimmer, und eine alternative Spielweise mit
-  Rollenzuweisung ähnlich Werwolf.
+- *Offen:* Sonderregeln für den Schwimmer.

@@ -24,4 +24,3 @@
 - **Schwimmer**: Ein Spieler mit nur noch 1 Leben. Für ihn gelten Sonderregeln, die noch nicht festgelegt sind.
 - **Gastgeber**: Wer den Raum eröffnet hat. Nur er kann die nächste Runde starten (bleibt
   während eines laufenden Spiels fest).
-- *Offen:* eine alternative Spielweise mit Rollenzuweisung ähnlich Werwolf, mit eigenen Rollen.
